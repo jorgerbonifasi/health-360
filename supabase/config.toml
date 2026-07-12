@@ -1,0 +1,20 @@
+# Supabase project config. Edge Functions that receive third-party webhooks or browser redirects
+# must NOT require a Supabase JWT, so verify_jwt is disabled for them. They enforce their own auth
+# instead (Strava verify token, Withings appli filter, Apple Health shared secret, OAuth code).
+#
+# reconcile + compute-scores are only invoked by pg_cron with the service-role bearer, so they keep
+# JWT verification on.
+
+project_id = "health-360"
+
+[functions.oauth-callback]
+verify_jwt = false
+
+[functions.strava-webhook]
+verify_jwt = false
+
+[functions.withings-webhook]
+verify_jwt = false
+
+[functions.apple-health]
+verify_jwt = false

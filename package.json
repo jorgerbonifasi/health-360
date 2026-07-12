@@ -1,0 +1,16 @@
+{
+  "name": "health-360",
+  "version": "1.0.0",
+  "description": "Aggregates **weight** (Withings), **exercise** (Strava), and **steps** (Apple Health) into one Supabase Postgres database, computes a daily **Health 360 Score** (0–100), and shows it all in a mobile-friendly React dashboard.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "supabase": "^2.109.1"
+  }
+}
