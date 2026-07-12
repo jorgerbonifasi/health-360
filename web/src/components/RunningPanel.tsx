@@ -10,27 +10,53 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card } from "./Card.tsx";
-import type { Goal, WeeklyRunning } from "../lib/types.ts";
-import { formatPace, goalValue, round1, shortDate } from "../lib/metrics.ts";
+import type { Activity, Goal } from "../lib/types.ts";
+import {
+  bucketIndexOf,
+  formatPace,
+  goalValue,
+  periodNoun,
+  recentBuckets,
+  round1,
+  type Period,
+} from "../lib/metrics.ts";
 
-// Weekly running km (bars) + average pace (line, right axis). Half-marathon training view.
+// Weekly/monthly running km (bars) + average pace (line). Half-marathon training view.
+function buildRows(activities: Activity[], period: Period) {
+  const buckets = recentBuckets(period, 12);
+  const agg = buckets.map(() => ({ dist: 0, time: 0 }));
+  for (const a of activities) {
+    if (a.type_group !== "Run") continue;
+    const idx = bucketIndexOf(buckets, new Date(a.started_at).getTime());
+    if (idx < 0) continue;
+    agg[idx].dist += a.distance_m;
+    agg[idx].time += a.moving_time_s;
+  }
+  return buckets.map((b, i) => {
+    const km = agg[i].dist / 1000;
+    const pace = agg[i].dist > 0 ? agg[i].time / 60 / km : null; // min/km
+    return { label: b.label, km: round1(km), pace: pace == null ? null : round1(pace) };
+  });
+}
+
 export function RunningPanel({
-  weeklyRunning,
+  activities,
   goals,
+  period,
 }: {
-  weeklyRunning: WeeklyRunning[];
+  activities: Activity[];
   goals: Goal[];
+  period: Period;
 }) {
-  const goal = goalValue(goals, "weekly_running_km_goal", NaN);
-  const data = weeklyRunning.map((r) => ({
-    label: shortDate(r.week_start),
-    km: round1(Number(r.km)),
-    pace: r.avg_pace_min_km == null ? null : round1(Number(r.avg_pace_min_km)),
-  }));
+  const data = buildRows(activities, period);
+  const hasRuns = data.some((d) => d.km > 0);
+  // Weekly goal scaled to the bucket (a month ≈ 4.345 weeks).
+  const weeklyGoal = goalValue(goals, "weekly_running_km_goal", NaN);
+  const goal = Number.isNaN(weeklyGoal) ? NaN : period === "week" ? weeklyGoal : weeklyGoal * 4.345;
 
   return (
-    <Card title="Running" subtitle="Weekly km + avg pace · Run only">
-      {data.length === 0 ? (
+    <Card title="Running" subtitle={`${periodNoun(period)}ly km + avg pace · Run only`}>
+      {!hasRuns ? (
         <p className="py-8 text-center text-sm text-slate-500">No runs recorded yet.</p>
       ) : (
         <div className="h-60">

@@ -1,5 +1,14 @@
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import type { DailyScore } from "../lib/types.ts";
+import { Delta } from "./Delta.tsx";
+import {
+  average,
+  periodNoun,
+  pctDelta,
+  recentBuckets,
+  trailingBounds,
+  type Period,
+} from "../lib/metrics.ts";
 
 function scoreColor(v: number): string {
   if (v >= 80) return "#10b981"; // emerald
@@ -9,16 +18,8 @@ function scoreColor(v: number): string {
 }
 
 // Small horizontal pillar bar with label + value.
-function PillarBar({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number | null;
-  color: string;
-}) {
-  const pct = value == null ? 0 : Math.min(value, 120) / 120 * 100;
+function PillarBar({ label, value, color }: { label: string; value: number | null; color: string }) {
+  const pct = value == null ? 0 : (Math.min(value, 120) / 120) * 100;
   return (
     <div>
       <div className="mb-1 flex justify-between text-xs">
@@ -37,10 +38,32 @@ function PillarBar({
   );
 }
 
-export function ScoreGauge({ scores }: { scores: DailyScore[] }) {
+function scoreEpoch(s: DailyScore): number {
+  return new Date(s.date + "T00:00:00").getTime();
+}
+
+export function ScoreGauge({ scores, period }: { scores: DailyScore[]; period: Period }) {
   const today = scores[scores.length - 1];
   const total = today ? Math.round(today.total) : null;
-  const last30 = scores.slice(-30);
+
+  // Sparkline: average score per bucket over the last 12 buckets.
+  const buckets = recentBuckets(period, 12);
+  const spark = buckets.map((b) => {
+    const inB = scores.filter((s) => {
+      const t = scoreEpoch(s);
+      return t >= b.start && t < b.end;
+    });
+    return { label: b.label, total: average(inB.map((s) => s.total)) };
+  });
+
+  // WoW/MoM delta: current trailing-window avg vs previous.
+  const avgInBounds = (offset: number) => {
+    const { start, end } = trailingBounds(period, offset);
+    return average(scores.filter((s) => scoreEpoch(s) >= start && scoreEpoch(s) < end).map((s) => s.total));
+  };
+  const cur = avgInBounds(0);
+  const prev = avgInBounds(-1);
+  const delta = cur != null && prev != null ? pctDelta(cur, prev) : null;
 
   // SVG ring geometry.
   const size = 160;
@@ -83,10 +106,10 @@ export function ScoreGauge({ scores }: { scores: DailyScore[] }) {
         </div>
       </div>
 
-      {last30.length > 1 && (
+      {spark.some((p) => p.total != null) && (
         <div className="mt-4 h-12">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={last30} margin={{ top: 4, bottom: 0, left: 0, right: 0 }}>
+            <LineChart data={spark} margin={{ top: 4, bottom: 0, left: 0, right: 0 }}>
               <YAxis domain={[0, 100]} hide />
               <Line
                 type="monotone"
@@ -94,13 +117,17 @@ export function ScoreGauge({ scores }: { scores: DailyScore[] }) {
                 stroke={color}
                 strokeWidth={2}
                 dot={false}
+                connectNulls
                 isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
-      <p className="mt-1 text-center text-[11px] text-slate-500">30-day trend</p>
+      <div className="mt-1 flex items-center justify-center gap-2 text-[11px] text-slate-500">
+        <span>12-{periodNoun(period)} trend</span>
+        <Delta value={delta} unit="%" goodWhen="up" suffix={`vs last ${periodNoun(period)}`} />
+      </div>
     </div>
   );
 }

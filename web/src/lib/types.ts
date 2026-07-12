@@ -40,21 +40,6 @@ export interface Goal {
   period: string | null;
 }
 
-export interface WeeklyActivityHours {
-  week_start: string; // YYYY-MM-DD (Monday)
-  type_group: ActivityGroup;
-  hours: number;
-  activity_count: number;
-}
-
-export interface WeeklyRunning {
-  week_start: string;
-  km: number;
-  moving_time_s: number;
-  avg_pace_min_km: number | null;
-  run_count: number;
-}
-
 export const ACTIVITY_GROUPS: ActivityGroup[] = [
   "Run",
   "Ride",

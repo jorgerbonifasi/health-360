@@ -11,10 +11,20 @@ import {
 } from "recharts";
 import { Card } from "./Card.tsx";
 import type { Goal, WeightLog } from "../lib/types.ts";
-import { goalValue, shortDate, weightSeriesWithTrailingAvg } from "../lib/metrics.ts";
+import { goalValue, shortDate, weightSeriesWithTrailingAvg, type Period } from "../lib/metrics.ts";
 
-export function WeightChart({ weights, goals }: { weights: WeightLog[]; goals: Goal[] }) {
-  const cutoff = Date.now() - 90 * 86400000;
+export function WeightChart({
+  weights,
+  goals,
+  period,
+}: {
+  weights: WeightLog[];
+  goals: Goal[];
+  period: Period;
+}) {
+  const rangeDays = period === "week" ? 90 : 365;
+  const subtitle = `Last ${period === "week" ? "90 days" : "12 months"} · 7-day average`;
+  const cutoff = Date.now() - rangeDays * 86400000;
   const series = weightSeriesWithTrailingAvg(weights)
     .filter((p) => p.t >= cutoff)
     .map((p) => ({ ...p, label: shortDate(p.date) }));
@@ -22,14 +32,14 @@ export function WeightChart({ weights, goals }: { weights: WeightLog[]; goals: G
 
   if (series.length === 0) {
     return (
-      <Card title="Weight" subtitle="Last 90 days">
+      <Card title="Weight" subtitle={subtitle}>
         <Empty />
       </Card>
     );
   }
 
   return (
-    <Card title="Weight" subtitle="Last 90 days · 7-day average">
+    <Card title="Weight" subtitle={subtitle}>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>

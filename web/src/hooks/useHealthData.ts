@@ -1,14 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
-import type {
-  Activity,
-  DailyScore,
-  DailyStep,
-  Goal,
-  WeeklyActivityHours,
-  WeeklyRunning,
-  WeightLog,
-} from "../lib/types.ts";
+import type { Activity, DailyScore, DailyStep, Goal, WeightLog } from "../lib/types.ts";
 
 export interface HealthData {
   scores: DailyScore[];
@@ -16,8 +8,6 @@ export interface HealthData {
   steps: DailyStep[];
   activities: Activity[];
   goals: Goal[];
-  weeklyHours: WeeklyActivityHours[];
-  weeklyRunning: WeeklyRunning[];
 }
 
 interface State {
@@ -26,10 +16,12 @@ interface State {
   error: string | null;
 }
 
+// ~13 months of history so the Month view can show 12 monthly buckets.
+const WINDOW_DAYS = 400;
+
 function daysAgoISO(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString();
 }
-
 function daysAgoDate(days: number): string {
   return daysAgoISO(days).slice(0, 10);
 }
@@ -43,7 +35,8 @@ function errorMessage(e: unknown): string {
   return String(e);
 }
 
-// Single hook that loads everything the dashboard needs in parallel.
+// Single hook that loads everything the dashboard needs in parallel. All time-bucketing
+// (weekly/monthly) happens client-side from these raw rows.
 export function useHealthData(): State {
   const [state, setState] = useState<State>({ data: null, loading: true, error: null });
 
@@ -62,51 +55,34 @@ export function useHealthData(): State {
 
     (async () => {
       try {
-        const [scores, weights, steps, activities, goals, weeklyHours, weeklyRunning] =
-          await Promise.all([
-            supabase
-              .from("daily_scores")
-              .select("date, total, movement_score, exercise_score, weight_score")
-              .gte("date", daysAgoDate(90))
-              .order("date", { ascending: true }),
-            supabase
-              .from("weight_logs")
-              .select("measured_at, weight_kg, fat_ratio")
-              .gte("measured_at", daysAgoISO(120))
-              .order("measured_at", { ascending: true }),
-            supabase
-              .from("daily_steps")
-              .select("date, steps")
-              .gte("date", daysAgoDate(60))
-              .order("date", { ascending: true }),
-            supabase
-              .from("activities")
-              .select(
-                "strava_id, type, type_group, name, started_at, distance_m, moving_time_s, avg_hr, elevation_m",
-              )
-              .gte("started_at", daysAgoISO(90))
-              .order("started_at", { ascending: false }),
-            supabase.from("goals").select("metric, target_value, direction, period"),
-            supabase
-              .from("v_weekly_activity_hours")
-              .select("week_start, type_group, hours, activity_count")
-              .gte("week_start", daysAgoDate(7 * 12))
-              .order("week_start", { ascending: true }),
-            supabase
-              .from("v_weekly_running")
-              .select("week_start, km, moving_time_s, avg_pace_min_km, run_count")
-              .gte("week_start", daysAgoDate(7 * 12))
-              .order("week_start", { ascending: true }),
-          ]);
+        const [scores, weights, steps, activities, goals] = await Promise.all([
+          supabase
+            .from("daily_scores")
+            .select("date, total, movement_score, exercise_score, weight_score")
+            .gte("date", daysAgoDate(WINDOW_DAYS))
+            .order("date", { ascending: true }),
+          supabase
+            .from("weight_logs")
+            .select("measured_at, weight_kg, fat_ratio")
+            .gte("measured_at", daysAgoISO(WINDOW_DAYS))
+            .order("measured_at", { ascending: true }),
+          supabase
+            .from("daily_steps")
+            .select("date, steps")
+            .gte("date", daysAgoDate(WINDOW_DAYS))
+            .order("date", { ascending: true }),
+          supabase
+            .from("activities")
+            .select(
+              "strava_id, type, type_group, name, started_at, distance_m, moving_time_s, avg_hr, elevation_m",
+            )
+            .gte("started_at", daysAgoISO(WINDOW_DAYS))
+            .order("started_at", { ascending: false }),
+          supabase.from("goals").select("metric, target_value, direction, period"),
+        ]);
 
         const firstError =
-          scores.error ||
-          weights.error ||
-          steps.error ||
-          activities.error ||
-          goals.error ||
-          weeklyHours.error ||
-          weeklyRunning.error;
+          scores.error || weights.error || steps.error || activities.error || goals.error;
         if (firstError) throw firstError;
 
         if (cancelled) return;
@@ -119,8 +95,6 @@ export function useHealthData(): State {
             steps: (steps.data ?? []) as DailyStep[],
             activities: (activities.data ?? []) as Activity[],
             goals: (goals.data ?? []) as Goal[],
-            weeklyHours: (weeklyHours.data ?? []) as WeeklyActivityHours[],
-            weeklyRunning: (weeklyRunning.data ?? []) as WeeklyRunning[],
           },
         });
       } catch (e) {

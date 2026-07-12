@@ -9,28 +9,40 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card } from "./Card.tsx";
-import { ACTIVITY_GROUPS, GROUP_COLORS, type WeeklyActivityHours } from "../lib/types.ts";
-import { round1, shortDate } from "../lib/metrics.ts";
+import { ACTIVITY_GROUPS, GROUP_COLORS, type Activity } from "../lib/types.ts";
+import { bucketIndexOf, periodNoun, recentBuckets, round1, type Period } from "../lib/metrics.ts";
 
-// Pivot the per-(week, group) rows into one row per week with a column per activity group.
-function pivot(rows: WeeklyActivityHours[]) {
-  const byWeek = new Map<string, Record<string, number | string>>();
-  for (const r of rows) {
-    const row = byWeek.get(r.week_start) ?? { week_start: r.week_start, label: shortDate(r.week_start) };
-    row[r.type_group] = round1(Number(r.hours));
-    byWeek.set(r.week_start, row);
+// Stacked active-hours-by-sport bars, bucketed weekly or monthly (last 12 buckets).
+function buildRows(activities: Activity[], period: Period) {
+  const buckets = recentBuckets(period, 12);
+  const rows = buckets.map((b) => {
+    const row: Record<string, number | string> = { label: b.label };
+    for (const g of ACTIVITY_GROUPS) row[g] = 0;
+    return row;
+  });
+  for (const a of activities) {
+    const idx = bucketIndexOf(buckets, new Date(a.started_at).getTime());
+    if (idx < 0) continue;
+    rows[idx][a.type_group] = (rows[idx][a.type_group] as number) + a.moving_time_s / 3600;
   }
-  return [...byWeek.values()].sort((a, b) =>
-    String(a.week_start).localeCompare(String(b.week_start)),
-  );
+  for (const row of rows) {
+    for (const g of ACTIVITY_GROUPS) row[g] = round1(row[g] as number);
+  }
+  return rows;
 }
 
-export function ActivityMixChart({ weeklyHours }: { weeklyHours: WeeklyActivityHours[] }) {
-  const data = pivot(weeklyHours);
+export function ActivityMixChart({
+  activities,
+  period,
+}: {
+  activities: Activity[];
+  period: Period;
+}) {
+  const data = buildRows(activities, period);
 
   return (
-    <Card title="Training load" subtitle="Active hours by sport · last 12 weeks">
-      {data.length === 0 ? (
+    <Card title="Training load" subtitle={`Active hours by sport · last 12 ${periodNoun(period)}s`}>
+      {activities.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-500">No activities yet.</p>
       ) : (
         <div className="h-64">

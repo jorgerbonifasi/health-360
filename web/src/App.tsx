@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { useHealthData } from "./hooks/useHealthData.ts";
+import type { Period } from "./lib/metrics.ts";
+import { PeriodToggle } from "./components/PeriodToggle.tsx";
 import { ScoreGauge } from "./components/ScoreGauge.tsx";
 import { SummaryHeader } from "./components/SummaryHeader.tsx";
 import { WeightChart } from "./components/WeightChart.tsx";
@@ -9,14 +12,18 @@ import { ActivityLog } from "./components/ActivityLog.tsx";
 
 export default function App() {
   const { data, loading, error } = useHealthData();
+  const [period, setPeriod] = useState<Period>("week");
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-2xl px-4 pb-16 pt-6">
-      <header className="mb-4 flex items-baseline justify-between">
-        <h1 className="text-xl font-bold text-slate-100">Health 360</h1>
-        <span className="text-xs text-slate-500">
-          {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
-        </span>
+      <header className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-100">Health 360</h1>
+          <span className="text-xs text-slate-500">
+            {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+          </span>
+        </div>
+        <PeriodToggle period={period} onChange={setPeriod} />
       </header>
 
       {loading && <Skeleton />}
@@ -34,17 +41,18 @@ export default function App() {
 
       {data && (
         <div className="space-y-4">
-          <ScoreGauge scores={data.scores} />
+          <ScoreGauge scores={data.scores} period={period} />
           <SummaryHeader
             weights={data.weights}
             steps={data.steps}
             activities={data.activities}
             goals={data.goals}
+            period={period}
           />
-          <WeightChart weights={data.weights} goals={data.goals} />
-          <StepsChart steps={data.steps} goals={data.goals} />
-          <ActivityMixChart weeklyHours={data.weeklyHours} />
-          <RunningPanel weeklyRunning={data.weeklyRunning} goals={data.goals} />
+          <WeightChart weights={data.weights} goals={data.goals} period={period} />
+          <StepsChart steps={data.steps} goals={data.goals} period={period} />
+          <ActivityMixChart activities={data.activities} period={period} />
+          <RunningPanel activities={data.activities} goals={data.goals} period={period} />
           <ActivityLog activities={data.activities} />
         </div>
       )}
