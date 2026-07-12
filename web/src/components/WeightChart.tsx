@@ -11,7 +11,15 @@ import {
 } from "recharts";
 import { Card } from "./Card.tsx";
 import type { Goal, WeightLog } from "../lib/types.ts";
-import { goalValue, shortDate, weightSeriesWithTrailingAvg, type Period } from "../lib/metrics.ts";
+import {
+  goalValue,
+  round1,
+  shortDate,
+  toDisplayWeight,
+  weightSeriesWithTrailingAvg,
+  WEIGHT_UNIT,
+  type Period,
+} from "../lib/metrics.ts";
 
 export function WeightChart({
   weights,
@@ -23,12 +31,17 @@ export function WeightChart({
   period: Period;
 }) {
   const rangeDays = period === "week" ? 90 : 365;
-  const subtitle = `Last ${period === "week" ? "90 days" : "12 months"} · 7-day average`;
+  const subtitle = `Last ${period === "week" ? "90 days" : "12 months"} · 7-day average · ${WEIGHT_UNIT}`;
   const cutoff = Date.now() - rangeDays * 86400000;
   const series = weightSeriesWithTrailingAvg(weights)
     .filter((p) => p.t >= cutoff)
-    .map((p) => ({ ...p, label: shortDate(p.date) }));
-  const target = goalValue(goals, "target_weight", NaN);
+    .map((p) => ({
+      ...p,
+      weight: round1(toDisplayWeight(p.weight)),
+      avg: round1(toDisplayWeight(p.avg)),
+      label: shortDate(p.date),
+    }));
+  const target = toDisplayWeight(goalValue(goals, "target_weight", NaN));
 
   if (series.length === 0) {
     return (
@@ -70,7 +83,7 @@ export function WeightChart({
                 y={target}
                 stroke="#f59e0b"
                 strokeDasharray="4 4"
-                label={{ value: `Goal ${target}`, fill: "#f59e0b", fontSize: 11, position: "insideTopRight" }}
+                label={{ value: `Goal ${Math.round(target)}`, fill: "#f59e0b", fontSize: 11, position: "insideTopRight" }}
               />
             )}
           </ComposedChart>

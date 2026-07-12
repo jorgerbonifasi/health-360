@@ -194,3 +194,15 @@ export function pctDelta(current: number, previous: number): number | null {
 export function average(nums: number[]): number | null {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
 }
+
+// ---------------------------------------------------------------------------
+// Weight units. Data is stored canonically in kg (Withings); the UI converts for display.
+// Flip WEIGHT_UNIT to "kg" to switch the whole dashboard back.
+// ---------------------------------------------------------------------------
+export const WEIGHT_UNIT: "kg" | "lb" = "lb";
+const KG_TO_LB = 2.2046226218;
+
+// Convert a kg value (or a kg delta — the scale is linear) to the display unit.
+export function toDisplayWeight(kg: number): number {
+  return WEIGHT_UNIT === "lb" ? kg * KG_TO_LB : kg;
+}

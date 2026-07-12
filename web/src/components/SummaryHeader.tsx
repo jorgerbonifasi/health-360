@@ -5,8 +5,10 @@ import {
   goalDirection,
   pctDelta,
   round1,
+  toDisplayWeight,
   trailingBounds,
   weightSummary,
+  WEIGHT_UNIT,
   type Period,
 } from "../lib/metrics.ts";
 import { Delta } from "./Delta.tsx";
@@ -48,7 +50,7 @@ export function SummaryHeader({
     average(weights.filter((w) => within(new Date(w.measured_at).getTime(), offset)).map((w) => w.weight_kg));
   const wCur = weightAvg(0);
   const wPrev = weightAvg(-1);
-  const wDelta = wCur != null && wPrev != null ? round1(wCur - wPrev) : null;
+  const wDelta = wCur != null && wPrev != null ? round1(toDisplayWeight(wCur - wPrev)) : null;
   const weightGood = goalDirection(goals, "target_weight") === "up" ? "up" : "down";
 
   // Steps — sum over the window.
@@ -73,8 +75,8 @@ export function SummaryHeader({
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <Stat
         label="Weight"
-        value={latest != null ? `${latest} kg` : "—"}
-        delta={<Delta value={wDelta} unit="kg" goodWhen={weightGood} />}
+        value={latest != null ? `${round1(toDisplayWeight(latest))} ${WEIGHT_UNIT}` : "—"}
+        delta={<Delta value={wDelta} unit={WEIGHT_UNIT} goodWhen={weightGood} />}
       />
       <Stat
         label={`Steps · ${win}`}

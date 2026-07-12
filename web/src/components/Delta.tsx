@@ -8,19 +8,19 @@ export function Delta({
   suffix,
 }: {
   value: number | null;
-  unit: "%" | "kg";
+  unit: "%" | "kg" | "lb";
   goodWhen: "up" | "down";
   suffix?: string;
 }) {
   if (value === null || !isFinite(value)) {
     return <span className="text-xs text-slate-500">— {suffix}</span>;
   }
-  const flat = Math.abs(value) < (unit === "%" ? 0.5 : 0.05);
+  const flat = Math.abs(value) < (unit === "%" ? 0.5 : 0.1);
   const up = value > 0;
   const good = flat ? null : goodWhen === "up" ? up : !up;
   const color = good === null ? "text-slate-400" : good ? "text-emerald-400" : "text-rose-400";
   const arrow = flat ? "→" : up ? "▲" : "▼";
-  const mag = unit === "%" ? `${Math.abs(Math.round(value))}%` : `${Math.abs(value).toFixed(1)} kg`;
+  const mag = unit === "%" ? `${Math.abs(Math.round(value))}%` : `${Math.abs(value).toFixed(1)} ${unit}`;
   return (
     <span className={`text-xs ${color}`}>
       {arrow} {mag}
