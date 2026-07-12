@@ -54,6 +54,29 @@ export function RunningPanel({
   const weeklyGoal = goalValue(goals, "weekly_running_km_goal", NaN);
   const goal = Number.isNaN(weeklyGoal) ? NaN : period === "week" ? weeklyGoal : weeklyGoal * 4.345;
 
+  // Fit the pace axis to the actual data (padding + a minimum span, snapped to clean 30s/1min
+  // ticks) instead of the wide 2:00–8:00 auto range, so the pace line uses the full height and
+  // month-to-month differences read. Explicit ticks avoid Recharts collapsing to a single label.
+  const { paceDomain, paceTicks } = ((): { paceDomain: [number, number]; paceTicks: number[] } => {
+    const paces = data.map((d) => d.pace).filter((p): p is number => p != null);
+    if (paces.length === 0) return { paceDomain: [4, 8], paceTicks: [4, 5, 6, 7, 8] };
+    const PAD = 0.4;
+    const MIN_SPAN = 1.5; // min/km — don't over-zoom a very consistent stretch
+    let lo = Math.min(...paces) - PAD;
+    let hi = Math.max(...paces) + PAD;
+    if (hi - lo < MIN_SPAN) {
+      const mid = (lo + hi) / 2;
+      lo = mid - MIN_SPAN / 2;
+      hi = mid + MIN_SPAN / 2;
+    }
+    const step = hi - lo > 3 ? 1 : 0.5; // 1-min ticks for a wide spread, else 30s
+    lo = Math.max(0, Math.floor(lo / step) * step);
+    hi = Math.ceil(hi / step) * step;
+    const ticks: number[] = [];
+    for (let v = lo; v <= hi + 1e-9; v += step) ticks.push(Math.round(v * 100) / 100);
+    return { paceDomain: [lo, hi], paceTicks: ticks };
+  })();
+
   return (
     <Card title="Running" subtitle={`${periodNoun(period)}ly km + avg pace · Run only`}>
       {!hasRuns ? (
@@ -74,6 +97,9 @@ export function RunningPanel({
                 yAxisId="pace"
                 orientation="right"
                 reversed
+                domain={paceDomain}
+                ticks={paceTicks}
+                interval={0}
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 width={40}
                 tickFormatter={(v) => formatPace(v).replace("/km", "")}
