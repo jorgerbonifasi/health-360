@@ -41,7 +41,7 @@ export default function App() {
 
       {data && (
         <div className="space-y-4">
-          <ScoreGauge scores={data.scores} period={period} />
+          <ScoreGauge scores={data.scores} goals={data.goals} period={period} />
           <SummaryHeader
             weights={data.weights}
             steps={data.steps}

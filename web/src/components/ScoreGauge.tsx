@@ -1,12 +1,17 @@
+import { useState } from "react";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
-import type { DailyScore } from "../lib/types.ts";
+import type { DailyScore, Goal } from "../lib/types.ts";
 import { Delta } from "./Delta.tsx";
 import {
   average,
+  goalDirection,
+  goalValue,
   periodNoun,
   pctDelta,
   recentBuckets,
+  toDisplayWeight,
   trailingBounds,
+  WEIGHT_UNIT,
   type Period,
 } from "../lib/metrics.ts";
 
@@ -42,7 +47,82 @@ function scoreEpoch(s: DailyScore): number {
   return new Date(s.date + "T00:00:00").getTime();
 }
 
-export function ScoreGauge({ scores, period }: { scores: DailyScore[]; period: Period }) {
+// Expandable "how this score works" panel — all values pulled live from the goals table.
+function ScoreInfo({ goals }: { goals: Goal[] }) {
+  const [open, setOpen] = useState(false);
+  const cap = goalValue(goals, "score_cap_ratio", 1.2);
+  const stepGoal = goalValue(goals, "daily_step_goal", 10000);
+  const hoursGoal = goalValue(goals, "weekly_active_hours_goal", 5);
+  const targetWeight = Math.round(toDisplayWeight(goalValue(goals, "target_weight", 75)));
+  const dir = goalDirection(goals, "target_weight");
+  const pct = (metric: string, fallback: number) => Math.round(goalValue(goals, metric, fallback) * 100);
+
+  const pillars = [
+    {
+      name: "Movement",
+      color: "#3b82f6",
+      weight: pct("pillar_weight_movement", 0.4),
+      goal: `${stepGoal.toLocaleString()} steps/day`,
+      formula: `min(steps ÷ goal, ${cap}) × 100`,
+    },
+    {
+      name: "Exercise",
+      color: "#f97316",
+      weight: pct("pillar_weight_exercise", 0.4),
+      goal: `${hoursGoal} h/week (all sports)`,
+      formula: `min(7-day active hours ÷ goal, ${cap}) × 100`,
+    },
+    {
+      name: "Weight",
+      color: "#10b981",
+      weight: pct("pillar_weight_weight", 0.2),
+      goal: `trending ${dir} → ${targetWeight} ${WEIGHT_UNIT}`,
+      formula: "7-day avg vs goal: toward 100 · flat 70 · away 40",
+    },
+  ];
+
+  return (
+    <div className="mt-3 border-t border-white/5 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-center gap-1 text-[11px] text-slate-400 hover:text-slate-200"
+      >
+        <span>ⓘ How this score works</span>
+        <span className="text-[9px]">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-3">
+          {pillars.map((p) => (
+            <div key={p.name}>
+              <div className="text-xs font-medium text-slate-200">
+                <span style={{ color: p.color }}>●</span> {p.name} · {p.weight}%
+              </div>
+              <div className="text-[11px] text-slate-400">Goal: {p.goal}</div>
+              <div className="text-[11px] text-slate-500">{p.formula}</div>
+            </div>
+          ))}
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            Total = weighted average of the pillars that have data — a missing pillar is dropped and
+            the rest re-weighted (never scored as zero). Each pillar is capped at{" "}
+            {Math.round(cap * 100)}%.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ScoreGauge({
+  scores,
+  goals,
+  period,
+}: {
+  scores: DailyScore[];
+  goals: Goal[];
+  period: Period;
+}) {
   const today = scores[scores.length - 1];
   const total = today ? Math.round(today.total) : null;
 
@@ -128,6 +208,8 @@ export function ScoreGauge({ scores, period }: { scores: DailyScore[]; period: P
         <span>12-{periodNoun(period)} trend</span>
         <Delta value={delta} unit="%" goodWhen="up" suffix={`vs last ${periodNoun(period)}`} />
       </div>
+
+      <ScoreInfo goals={goals} />
     </div>
   );
 }
