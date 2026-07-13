@@ -1,43 +1,36 @@
 // Compute + store the daily Health 360 score. Invoked nightly by pg_cron (after reconcile) or
-// manually. Recomputes the last few days so late-arriving data (missed webhook backfilled by
-// reconcile) is reflected. All dates are handled in UTC.
+// manually. By default it recomputes the last few days (so late-arriving data is reflected);
+// pass ?days=N (or {"days":N}) to backfill a longer range — e.g. ?days=365 for a full year.
+//
+// All data is fetched once and scored in-memory, so a year-long backfill is a handful of queries
+// plus a single bulk upsert. All dates are handled in UTC.
 
 import { getServiceClient, type SupabaseClient } from "../_shared/supabase.ts";
-import {
-  computeDailyScore,
-  mean,
-  type Direction,
-  type ScoreGoals,
-} from "../_shared/scoring.ts";
+import { computeDailyScore, mean, type Direction, type ScoreGoals } from "../_shared/scoring.ts";
 import { json } from "../_shared/cors.ts";
 
-const RECOMPUTE_DAYS = 3; // today + the previous 2 days
+const DEFAULT_DAYS = 3;
+const MAX_DAYS = 400;
+const DAY = 86400000;
 
-// YYYY-MM-DD for a Date, in UTC.
+function utcMidnight(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+function addDays(d: Date, n: number): Date {
+  const c = new Date(d);
+  c.setUTCDate(c.getUTCDate() + n);
+  return c;
+}
 function dateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function addDays(d: Date, days: number): Date {
-  const copy = new Date(d);
-  copy.setUTCDate(copy.getUTCDate() + days);
-  return copy;
-}
-
-// Start-of-day (00:00:00.000 UTC) for the given date.
-function utcMidnight(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
 async function loadGoals(client: SupabaseClient): Promise<ScoreGoals> {
-  const { data, error } = await client
-    .from("goals")
-    .select("metric, target_value, direction");
+  const { data, error } = await client.from("goals").select("metric, target_value, direction");
   if (error) throw new Error(`Failed to load goals: ${error.message}`);
 
   const map = new Map<string, { value: number; direction: string | null }>();
   for (const g of data ?? []) map.set(g.metric, { value: Number(g.target_value), direction: g.direction });
-
   const val = (m: string, fallback: number) => map.get(m)?.value ?? fallback;
 
   return {
@@ -53,108 +46,84 @@ async function loadGoals(client: SupabaseClient): Promise<ScoreGoals> {
   };
 }
 
-// Steps recorded for a given day (null if there's no row).
-async function stepsForDay(client: SupabaseClient, day: string): Promise<number | null> {
-  const { data, error } = await client
-    .from("daily_steps")
-    .select("steps")
-    .eq("date", day)
-    .maybeSingle();
-  if (error) throw new Error(`steps query failed: ${error.message}`);
-  return data ? Number(data.steps) : null;
-}
-
-// Trailing-7-day active hours ending on `dayMid` (inclusive). `dayMid` is UTC midnight.
-async function activeHours(client: SupabaseClient, dayMid: Date): Promise<number> {
-  const startIso = addDays(dayMid, -6).toISOString(); // 7-day window inclusive of the day
-  const endIso = addDays(dayMid, 1).toISOString(); // exclusive upper bound (start of next day)
-  const { data, error } = await client
-    .from("activities")
-    .select("moving_time_s")
-    .gte("started_at", startIso)
-    .lt("started_at", endIso);
-  if (error) throw new Error(`activities query failed: ${error.message}`);
-  const seconds = (data ?? []).reduce((acc, a) => acc + Number(a.moving_time_s ?? 0), 0);
-  return seconds / 3600;
-}
-
-// 7-day rolling averages of weight: the window ending on `dayMid` ([day-6, day]) and the window
-// ending 7 days earlier ([day-13, day-7]). `dayMid` is UTC midnight.
-async function weightAverages(
-  client: SupabaseClient,
-  dayMid: Date,
-): Promise<{ recent: number | null; prior: number | null }> {
-  const priorStart = addDays(dayMid, -13); // covers both 7-day windows
-  const recentStart = addDays(dayMid, -6);
-  const endIso = addDays(dayMid, 1).toISOString();
-  const { data, error } = await client
-    .from("weight_logs")
-    .select("measured_at, weight_kg")
-    .gte("measured_at", priorStart.toISOString())
-    .lt("measured_at", endIso);
-  if (error) throw new Error(`weight query failed: ${error.message}`);
-
-  const recentStartT = recentStart.getTime();
-  const priorStartT = priorStart.getTime();
-
-  const recent: number[] = [];
-  const prior: number[] = [];
-  for (const row of data ?? []) {
-    const t = new Date(row.measured_at).getTime();
-    const w = Number(row.weight_kg);
-    if (t >= recentStartT) recent.push(w); // [day-6, day]
-    else if (t >= priorStartT) prior.push(w); // [day-13, day-7)
-  }
-  return { recent: mean(recent), prior: mean(prior) };
-}
-
-async function computeForDay(client: SupabaseClient, day: Date, goals: ScoreGoals) {
-  const dayMid = utcMidnight(day);
-  const key = dateKey(dayMid);
-  const [steps, hours, weights] = await Promise.all([
-    stepsForDay(client, key),
-    activeHours(client, dayMid),
-    weightAverages(client, dayMid),
-  ]);
-
-  const result = computeDailyScore(
-    {
-      steps,
-      weeklyActiveHours: hours,
-      weightRecentAvg: weights.recent,
-      weightPriorAvg: weights.prior,
-    },
-    goals,
-  );
-
-  const { error } = await client.from("daily_scores").upsert(
-    {
-      date: key,
-      total: result.total,
-      movement_score: result.movement,
-      exercise_score: result.exercise,
-      weight_score: result.weight,
-      details: { ...result.details, effectiveWeights: result.effectiveWeights },
-      computed_at: new Date().toISOString(),
-    },
-    { onConflict: "date" },
-  );
-  if (error) throw new Error(`Failed to upsert daily_scores for ${key}: ${error.message}`);
-
-  return { date: key, total: result.total };
-}
-
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
   try {
     const client = getServiceClient();
+
+    // How many days back to (re)compute.
+    let days = DEFAULT_DAYS;
+    const qDays = new URL(req.url).searchParams.get("days");
+    if (qDays) days = Number(qDays);
+    else {
+      try {
+        const body = await req.json();
+        if (body?.days) days = Number(body.days);
+      } catch (_) { /* no/invalid body → default */ }
+    }
+    if (!Number.isFinite(days) || days <= 0) days = DEFAULT_DAYS;
+    days = Math.min(days, MAX_DAYS);
+
     const goals = await loadGoals(client);
 
-    const today = new Date();
-    const results = [];
-    for (let i = 0; i < RECOMPUTE_DAYS; i++) {
-      results.push(await computeForDay(client, addDays(today, -i), goals));
+    const today = utcMidnight(new Date());
+    const oldest = addDays(today, -(days - 1));
+    const fetchFrom = addDays(oldest, -14); // extra history for the weight prior window
+
+    // Fetch everything once.
+    const [stepsRes, actRes, wRes] = await Promise.all([
+      client.from("daily_steps").select("date, steps").gte("date", dateKey(fetchFrom)),
+      client.from("activities").select("started_at, moving_time_s").gte("started_at", fetchFrom.toISOString()),
+      client.from("weight_logs").select("measured_at, weight_kg").gte("measured_at", fetchFrom.toISOString()),
+    ]);
+    if (stepsRes.error) throw new Error(stepsRes.error.message);
+    if (actRes.error) throw new Error(actRes.error.message);
+    if (wRes.error) throw new Error(wRes.error.message);
+
+    const stepsByDate = new Map<string, number>();
+    for (const s of stepsRes.data ?? []) stepsByDate.set(s.date, Number(s.steps));
+    const acts = (actRes.data ?? []).map((a) => ({ t: new Date(a.started_at).getTime(), s: Number(a.moving_time_s ?? 0) }));
+    const wts = (wRes.data ?? []).map((w) => ({ t: new Date(w.measured_at).getTime(), kg: Number(w.weight_kg) }));
+
+    const computedAt = new Date().toISOString();
+    const rows = [];
+    for (let i = 0; i < days; i++) {
+      const day = addDays(today, -i);
+      const key = dateKey(day);
+      const ms = day.getTime();
+
+      const steps = stepsByDate.has(key) ? stepsByDate.get(key)! : null;
+
+      // Trailing-7-day active hours ending on `day` (inclusive).
+      const exStart = ms - 6 * DAY;
+      const exEnd = ms + DAY;
+      const weeklyActiveHours = acts.filter((a) => a.t >= exStart && a.t < exEnd).reduce((sum, a) => sum + a.s, 0) / 3600;
+
+      // 7-day rolling weight averages: recent [day-6, day], prior [day-13, day-7].
+      const recentStart = ms - 6 * DAY;
+      const priorStart = ms - 13 * DAY;
+      const recent = wts.filter((w) => w.t >= recentStart && w.t < exEnd).map((w) => w.kg);
+      const prior = wts.filter((w) => w.t >= priorStart && w.t < recentStart).map((w) => w.kg);
+
+      const result = computeDailyScore(
+        { steps, weeklyActiveHours, weightRecentAvg: mean(recent), weightPriorAvg: mean(prior) },
+        goals,
+      );
+
+      rows.push({
+        date: key,
+        total: result.total,
+        movement_score: result.movement,
+        exercise_score: result.exercise,
+        weight_score: result.weight,
+        details: { ...result.details, effectiveWeights: result.effectiveWeights },
+        computed_at: computedAt,
+      });
     }
-    return json({ ok: true, computed: results }, 200);
+
+    const { error } = await client.from("daily_scores").upsert(rows, { onConflict: "date" });
+    if (error) throw new Error(`Failed to upsert daily_scores: ${error.message}`);
+
+    return json({ ok: true, computed_days: rows.length, from: dateKey(oldest), to: dateKey(today) }, 200);
   } catch (e) {
     console.error("compute-scores error", e);
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
