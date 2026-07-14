@@ -30,8 +30,9 @@ export function WeightChart({
   goals: Goal[];
   period: Period;
 }) {
-  const rangeDays = period === "week" ? 90 : 365;
-  const subtitle = `Last ${period === "week" ? "90 days" : "12 months"} · 7-day average · ${WEIGHT_UNIT}`;
+  const rangeDays = period === "day" ? 30 : period === "week" ? 90 : 365;
+  const rangeLabel = period === "day" ? "30 days" : period === "week" ? "90 days" : "12 months";
+  const subtitle = `Last ${rangeLabel} · 7-day average · ${WEIGHT_UNIT}`;
   const cutoff = Date.now() - rangeDays * 86400000;
   const series = weightSeriesWithTrailingAvg(weights)
     .filter((p) => p.t >= cutoff)

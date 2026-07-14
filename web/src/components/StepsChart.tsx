@@ -12,6 +12,7 @@ import {
 import { Card } from "./Card.tsx";
 import type { DailyStep, Goal } from "../lib/types.ts";
 import {
+  bucketCount,
   bucketIndexOf,
   goalValue,
   periodNoun,
@@ -31,14 +32,14 @@ export function StepsChart({
   period: Period;
 }) {
   const dailyGoal = goalValue(goals, "daily_step_goal", 10000);
-  const buckets = recentBuckets(period, 12);
+  const buckets = recentBuckets(period, bucketCount(period));
   const totals = buckets.map(() => 0);
   for (const s of steps) {
     const idx = bucketIndexOf(buckets, new Date(s.date + "T00:00:00").getTime());
     if (idx >= 0) totals[idx] += s.steps;
   }
   const data = buckets.map((b, i) => ({ label: b.label, steps: totals[i] }));
-  const periodGoal = dailyGoal * (period === "week" ? 7 : 30);
+  const periodGoal = dailyGoal * (period === "day" ? 1 : period === "week" ? 7 : 30);
   const streak = stepStreak(steps, dailyGoal);
 
   return (

@@ -10,11 +10,11 @@ import {
 } from "recharts";
 import { Card } from "./Card.tsx";
 import { ACTIVITY_GROUPS, GROUP_COLORS, type Activity } from "../lib/types.ts";
-import { bucketIndexOf, periodNoun, recentBuckets, round1, type Period } from "../lib/metrics.ts";
+import { bucketCount, bucketIndexOf, periodNoun, recentBuckets, round1, type Period } from "../lib/metrics.ts";
 
-// Stacked active-hours-by-sport bars, bucketed weekly or monthly (last 12 buckets).
+// Stacked active-hours-by-sport bars, bucketed by day / week / month.
 function buildRows(activities: Activity[], period: Period) {
-  const buckets = recentBuckets(period, 12);
+  const buckets = recentBuckets(period, bucketCount(period));
   const rows = buckets.map((b) => {
     const row: Record<string, number | string> = { label: b.label };
     for (const g of ACTIVITY_GROUPS) row[g] = 0;
@@ -41,7 +41,7 @@ export function ActivityMixChart({
   const data = buildRows(activities, period);
 
   return (
-    <Card title="Training load" subtitle={`Active hours by sport · last 12 ${periodNoun(period)}s`}>
+    <Card title="Training load" subtitle={`Active hours by sport · last ${bucketCount(period)} ${periodNoun(period)}s`}>
       {activities.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-500">No activities yet.</p>
       ) : (

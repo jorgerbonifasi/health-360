@@ -12,18 +12,19 @@ import {
 import { Card } from "./Card.tsx";
 import type { Activity, Goal } from "../lib/types.ts";
 import {
+  bucketCount,
   bucketIndexOf,
   formatPace,
   goalValue,
-  periodNoun,
+  periodAdjective,
   recentBuckets,
   round1,
   type Period,
 } from "../lib/metrics.ts";
 
-// Weekly/monthly running km (bars) + average pace (line). Half-marathon training view.
+// Running km (bars) + average pace (line) per day / week / month. Half-marathon training view.
 function buildRows(activities: Activity[], period: Period) {
-  const buckets = recentBuckets(period, 12);
+  const buckets = recentBuckets(period, bucketCount(period));
   const agg = buckets.map(() => ({ dist: 0, time: 0 }));
   for (const a of activities) {
     if (a.type_group !== "Run") continue;
@@ -50,9 +51,11 @@ export function RunningPanel({
 }) {
   const data = buildRows(activities, period);
   const hasRuns = data.some((d) => d.km > 0);
-  // Weekly goal scaled to the bucket (a month ≈ 4.345 weeks).
+  // Weekly goal scaled to the bucket (day = /7, month ≈ ×4.345 weeks).
   const weeklyGoal = goalValue(goals, "weekly_running_km_goal", NaN);
-  const goal = Number.isNaN(weeklyGoal) ? NaN : period === "week" ? weeklyGoal : weeklyGoal * 4.345;
+  const goal = Number.isNaN(weeklyGoal)
+    ? NaN
+    : period === "day" ? weeklyGoal / 7 : period === "week" ? weeklyGoal : weeklyGoal * 4.345;
 
   // Fit the pace axis to the actual data (padding + a minimum span, snapped to clean 30s/1min
   // ticks) instead of the wide 2:00–8:00 auto range, so the pace line uses the full height and
@@ -78,7 +81,7 @@ export function RunningPanel({
   })();
 
   return (
-    <Card title="Running" subtitle={`${periodNoun(period)}ly km + avg pace · Run only`}>
+    <Card title="Running" subtitle={`${periodAdjective(period)} km + avg pace · Run only`}>
       {!hasRuns ? (
         <p className="py-8 text-center text-sm text-slate-500">No runs recorded yet.</p>
       ) : (

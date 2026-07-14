@@ -9,6 +9,7 @@ export function PeriodToggle({
   onChange: (p: Period) => void;
 }) {
   const options: { value: Period; label: string }[] = [
+    { value: "day", label: "Day" },
     { value: "week", label: "Week" },
     { value: "month", label: "Month" },
   ];

@@ -38,7 +38,7 @@ export function SummaryHeader({
   goals: Goal[];
   period: Period;
 }) {
-  const win = period === "week" ? "7d" : "30d";
+  const win = period === "day" ? "today" : period === "week" ? "7d" : "30d";
   const within = (t: number, offset: number) => {
     const { start, end } = trailingBounds(period, offset);
     return t >= start && t < end;

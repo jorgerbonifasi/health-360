@@ -4,10 +4,12 @@ import type { DailyScore, Goal } from "../lib/types.ts";
 import { Delta } from "./Delta.tsx";
 import {
   average,
+  bucketCount,
   goalDirection,
   goalValue,
   periodNoun,
   pctDelta,
+  previousLabel,
   recentBuckets,
   toDisplayWeight,
   trailingBounds,
@@ -126,8 +128,8 @@ export function ScoreGauge({
   const today = scores[scores.length - 1];
   const total = today ? Math.round(today.total) : null;
 
-  // Sparkline: average score per bucket over the last 12 buckets.
-  const buckets = recentBuckets(period, 12);
+  // Sparkline: average score per bucket over the recent buckets.
+  const buckets = recentBuckets(period, bucketCount(period));
   const spark = buckets.map((b) => {
     const inB = scores.filter((s) => {
       const t = scoreEpoch(s);
@@ -205,8 +207,8 @@ export function ScoreGauge({
         </div>
       )}
       <div className="mt-1 flex items-center justify-center gap-2 text-[11px] text-slate-500">
-        <span>12-{periodNoun(period)} trend</span>
-        <Delta value={delta} unit="%" goodWhen="up" suffix={`vs last ${periodNoun(period)}`} />
+        <span>{bucketCount(period)}-{periodNoun(period)} trend</span>
+        <Delta value={delta} unit="%" goodWhen="up" suffix={`vs ${previousLabel(period)}`} />
       </div>
 
       <ScoreInfo goals={goals} />

@@ -111,10 +111,24 @@ export function shortDate(iso: string): string {
 // ---------------------------------------------------------------------------
 // Week/Month period bucketing + period-over-period (WoW / MoM) comparisons
 // ---------------------------------------------------------------------------
-export type Period = "week" | "month";
+export type Period = "day" | "week" | "month";
 
 export function periodNoun(period: Period): string {
-  return period === "week" ? "week" : "month";
+  return period === "day" ? "day" : period === "week" ? "week" : "month";
+}
+
+export function periodAdjective(period: Period): string {
+  return period === "day" ? "daily" : period === "week" ? "weekly" : "monthly";
+}
+
+// Label for the previous period, used in delta captions.
+export function previousLabel(period: Period): string {
+  return period === "day" ? "yesterday" : period === "week" ? "last week" : "last month";
+}
+
+// How many buckets each view shows (Day zooms in on the last month of daily detail).
+export function bucketCount(period: Period): number {
+  return period === "day" ? 30 : 12;
 }
 
 // Local YYYY-MM-DD (avoids UTC off-by-one from toISOString).
@@ -132,24 +146,26 @@ export function bucketStart(d: Date, period: Period): Date {
   if (period === "week") {
     const day = (c.getDay() + 6) % 7; // Monday = 0
     c.setDate(c.getDate() - day);
-  } else {
+  } else if (period === "month") {
     c.setDate(1);
   }
+  // day: already at local midnight
   return c;
 }
 
 export function addPeriods(d: Date, period: Period, n: number): Date {
   const c = new Date(d);
-  if (period === "week") c.setDate(c.getDate() + n * 7);
+  if (period === "day") c.setDate(c.getDate() + n);
+  else if (period === "week") c.setDate(c.getDate() + n * 7);
   else c.setMonth(c.getMonth() + n);
   return c;
 }
 
 export function bucketLabel(key: string, period: Period): string {
   const d = new Date(key + "T00:00:00");
-  return period === "week"
-    ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-    : d.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+  return period === "month"
+    ? d.toLocaleDateString(undefined, { month: "short", year: "2-digit" })
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export interface Bucket {
@@ -179,7 +195,7 @@ export function bucketIndexOf(buckets: Bucket[], t: number): number {
 // Trailing window [start,end) for deltas: offset 0 = current window, -1 = previous.
 // Uses a rolling window (last 7 / last 30 days) so a partial calendar period doesn't skew the Δ.
 export function trailingBounds(period: Period, offset: number, now = new Date()): { start: number; end: number } {
-  const days = period === "week" ? 7 : 30;
+  const days = period === "day" ? 1 : period === "week" ? 7 : 30;
   const anchor = new Date(now);
   anchor.setHours(0, 0, 0, 0);
   const end = anchor.getTime() + DAY_MS + offset * days * DAY_MS; // include today
