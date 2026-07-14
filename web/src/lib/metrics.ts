@@ -222,3 +222,36 @@ const KG_TO_LB = 2.2046226218;
 export function toDisplayWeight(kg: number): number {
   return WEIGHT_UNIT === "lb" ? kg * KG_TO_LB : kg;
 }
+
+// ---------------------------------------------------------------------------
+// Relative-time helpers (for the "last synced" footer)
+// ---------------------------------------------------------------------------
+
+// Relative time from an ISO timestamp: "just now", "5m ago", "3h ago", else a date.
+export function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = new Date(iso).getTime();
+  if (!isFinite(t)) return "—";
+  const min = Math.floor((Date.now() - t) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  if (d === 1) return "yesterday";
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// Day-level label from a YYYY-MM-DD string: "today", "yesterday", "3d ago", else a date.
+export function dayLabel(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + "T00:00:00");
+  const diff = Math.round((today.getTime() - d.getTime()) / DAY_MS);
+  if (diff <= 0) return "today";
+  if (diff === 1) return "yesterday";
+  if (diff < 7) return `${diff}d ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}

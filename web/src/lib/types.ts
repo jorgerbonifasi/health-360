@@ -6,6 +6,7 @@ export interface DailyScore {
   movement_score: number | null;
   exercise_score: number | null;
   weight_score: number | null;
+  computed_at?: string; // ISO — when the score was last computed
 }
 
 export interface WeightLog {

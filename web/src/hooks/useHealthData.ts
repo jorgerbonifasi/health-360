@@ -58,7 +58,7 @@ export function useHealthData(): State {
         const [scores, weights, steps, activities, goals] = await Promise.all([
           supabase
             .from("daily_scores")
-            .select("date, total, movement_score, exercise_score, weight_score")
+            .select("date, total, movement_score, exercise_score, weight_score, computed_at")
             .gte("date", daysAgoDate(WINDOW_DAYS))
             .order("date", { ascending: true }),
           supabase
