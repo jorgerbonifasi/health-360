@@ -7,7 +7,7 @@
 
 import { getServiceClient, type SupabaseClient } from "../_shared/supabase.ts";
 import { computeDailyScore, mean, type Direction, type ScoreGoals } from "../_shared/scoring.ts";
-import { json } from "../_shared/cors.ts";
+import { json, handlePreflight } from "../_shared/cors.ts";
 
 const DEFAULT_DAYS = 3;
 const MAX_DAYS = 400;
@@ -47,6 +47,9 @@ async function loadGoals(client: SupabaseClient): Promise<ScoreGoals> {
 }
 
 Deno.serve(async (req) => {
+  const pre = handlePreflight(req);
+  if (pre) return pre;
+
   try {
     const client = getServiceClient();
 

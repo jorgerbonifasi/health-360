@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useHealthData } from "./hooks/useHealthData.ts";
 import type { Period } from "./lib/metrics.ts";
 import { PeriodToggle } from "./components/PeriodToggle.tsx";
+import { RefreshButton } from "./components/RefreshButton.tsx";
 import { ScoreGauge } from "./components/ScoreGauge.tsx";
 import { SummaryHeader } from "./components/SummaryHeader.tsx";
 import { WeightChart } from "./components/WeightChart.tsx";
@@ -12,7 +13,7 @@ import { ActivityLog } from "./components/ActivityLog.tsx";
 import { LastSynced } from "./components/LastSynced.tsx";
 
 export default function App() {
-  const { data, loading, error } = useHealthData();
+  const { data, loading, error, refetch } = useHealthData();
   const [period, setPeriod] = useState<Period>("week");
 
   return (
@@ -24,7 +25,10 @@ export default function App() {
             {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
           </span>
         </div>
-        <PeriodToggle period={period} onChange={setPeriod} />
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefreshed={refetch} />
+          <PeriodToggle period={period} onChange={setPeriod} />
+        </div>
       </header>
 
       {loading && <Skeleton />}

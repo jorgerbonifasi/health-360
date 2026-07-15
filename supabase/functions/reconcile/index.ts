@@ -5,12 +5,15 @@
 import { getServiceClient } from "../_shared/supabase.ts";
 import { listActivitiesAfter, stravaActivityToRow, upsertActivities } from "../_shared/strava.ts";
 import { getMeasures, measureGroupToRow, upsertWeights } from "../_shared/withings.ts";
-import { json } from "../_shared/cors.ts";
+import { json, handlePreflight } from "../_shared/cors.ts";
 
 const DEFAULT_WINDOW_DAYS = 7;
 const MAX_WINDOW_DAYS = 365;
 
 Deno.serve(async (req) => {
+  const pre = handlePreflight(req);
+  if (pre) return pre;
+
   const client = getServiceClient();
 
   // Nightly cron uses the 7-day default; pass ?days=N (or {"days":N}) for a wider one-time backfill.

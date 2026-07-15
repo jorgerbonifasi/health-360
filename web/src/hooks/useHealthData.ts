@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
 import type { Activity, DailyScore, DailyStep, Goal, WeightLog } from "../lib/types.ts";
 
@@ -35,78 +35,68 @@ function errorMessage(e: unknown): string {
   return String(e);
 }
 
-// Single hook that loads everything the dashboard needs in parallel. All time-bucketing
-// (weekly/monthly) happens client-side from these raw rows.
-export function useHealthData(): State {
+// Load everything the dashboard needs in parallel. All time-bucketing happens client-side.
+async function fetchAll(): Promise<HealthData> {
+  if (import.meta.env.VITE_USE_MOCK === "1") {
+    const { buildMockData } = await import("../lib/mockData.ts");
+    return buildMockData();
+  }
+
+  const [scores, weights, steps, activities, goals] = await Promise.all([
+    supabase
+      .from("daily_scores")
+      .select("date, total, movement_score, exercise_score, weight_score, computed_at")
+      .gte("date", daysAgoDate(WINDOW_DAYS))
+      .order("date", { ascending: true }),
+    supabase
+      .from("weight_logs")
+      .select("measured_at, weight_kg, fat_ratio")
+      .gte("measured_at", daysAgoISO(WINDOW_DAYS))
+      .order("measured_at", { ascending: true }),
+    supabase
+      .from("daily_steps")
+      .select("date, steps")
+      .gte("date", daysAgoDate(WINDOW_DAYS))
+      .order("date", { ascending: true }),
+    supabase
+      .from("activities")
+      .select(
+        "strava_id, type, type_group, name, started_at, distance_m, moving_time_s, avg_hr, elevation_m",
+      )
+      .gte("started_at", daysAgoISO(WINDOW_DAYS))
+      .order("started_at", { ascending: false }),
+    supabase.from("goals").select("metric, target_value, direction, period"),
+  ]);
+
+  const firstError =
+    scores.error || weights.error || steps.error || activities.error || goals.error;
+  if (firstError) throw firstError;
+
+  return {
+    scores: (scores.data ?? []) as DailyScore[],
+    weights: (weights.data ?? []) as WeightLog[],
+    steps: (steps.data ?? []) as DailyStep[],
+    activities: (activities.data ?? []) as Activity[],
+    goals: (goals.data ?? []) as Goal[],
+  };
+}
+
+export function useHealthData(): State & { refetch: () => Promise<void> } {
   const [state, setState] = useState<State>({ data: null, loading: true, error: null });
 
-  useEffect(() => {
-    let cancelled = false;
-
-    // Demo mode: render a realistic dataset without a backend (VITE_USE_MOCK=1).
-    if (import.meta.env.VITE_USE_MOCK === "1") {
-      import("../lib/mockData.ts").then(({ buildMockData }) => {
-        if (!cancelled) setState({ data: buildMockData(), loading: false, error: null });
-      });
-      return () => {
-        cancelled = true;
-      };
+  // On refetch we keep the existing data on screen and just swap it in when the new load lands.
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchAll();
+      setState({ data, loading: false, error: null });
+    } catch (e) {
+      setState((s) => ({ data: s.data, loading: false, error: errorMessage(e) }));
     }
-
-    (async () => {
-      try {
-        const [scores, weights, steps, activities, goals] = await Promise.all([
-          supabase
-            .from("daily_scores")
-            .select("date, total, movement_score, exercise_score, weight_score, computed_at")
-            .gte("date", daysAgoDate(WINDOW_DAYS))
-            .order("date", { ascending: true }),
-          supabase
-            .from("weight_logs")
-            .select("measured_at, weight_kg, fat_ratio")
-            .gte("measured_at", daysAgoISO(WINDOW_DAYS))
-            .order("measured_at", { ascending: true }),
-          supabase
-            .from("daily_steps")
-            .select("date, steps")
-            .gte("date", daysAgoDate(WINDOW_DAYS))
-            .order("date", { ascending: true }),
-          supabase
-            .from("activities")
-            .select(
-              "strava_id, type, type_group, name, started_at, distance_m, moving_time_s, avg_hr, elevation_m",
-            )
-            .gte("started_at", daysAgoISO(WINDOW_DAYS))
-            .order("started_at", { ascending: false }),
-          supabase.from("goals").select("metric, target_value, direction, period"),
-        ]);
-
-        const firstError =
-          scores.error || weights.error || steps.error || activities.error || goals.error;
-        if (firstError) throw firstError;
-
-        if (cancelled) return;
-        setState({
-          loading: false,
-          error: null,
-          data: {
-            scores: (scores.data ?? []) as DailyScore[],
-            weights: (weights.data ?? []) as WeightLog[],
-            steps: (steps.data ?? []) as DailyStep[],
-            activities: (activities.data ?? []) as Activity[],
-            goals: (goals.data ?? []) as Goal[],
-          },
-        });
-      } catch (e) {
-        if (cancelled) return;
-        setState({ data: null, loading: false, error: errorMessage(e) });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  return state;
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return { ...state, refetch: load };
 }
