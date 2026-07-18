@@ -5,6 +5,7 @@ import { Delta } from "./Delta.tsx";
 import {
   average,
   bucketCount,
+  dayLabel,
   goalDirection,
   goalValue,
   periodNoun,
@@ -125,7 +126,11 @@ export function ScoreGauge({
   goals: Goal[];
   period: Period;
 }) {
-  const today = scores[scores.length - 1];
+  // Headline = the most recent *complete* day (today is in-progress: partial steps would make
+  // Movement read low every morning). Falls back to the latest score if that's all there is.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const complete = scores.filter((s) => s.date < todayKey);
+  const today = complete.length ? complete[complete.length - 1] : scores[scores.length - 1];
   const total = today ? Math.round(today.total) : null;
 
   // Sparkline: average score per bucket over the recent buckets.
@@ -178,6 +183,7 @@ export function ScoreGauge({
               {total ?? "—"}
             </span>
             <span className="text-xs text-slate-400">Health 360</span>
+            {today && <span className="text-[10px] text-slate-500">{dayLabel(today.date)}</span>}
           </div>
         </div>
 
