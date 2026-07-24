@@ -10,6 +10,7 @@ import { WeightChart } from "./components/WeightChart.tsx";
 import { StepsChart } from "./components/StepsChart.tsx";
 import { ActivityMixChart } from "./components/ActivityMixChart.tsx";
 import { RunningPanel } from "./components/RunningPanel.tsx";
+import { RunPlanCard } from "./components/RunPlanCard.tsx";
 import { ActivityLog } from "./components/ActivityLog.tsx";
 import { LastSynced } from "./components/LastSynced.tsx";
 
@@ -75,6 +76,7 @@ export default function App() {
           <StepsChart steps={data.steps} goals={data.goals} period={period} />
           <ActivityMixChart activities={data.activities} period={period} />
           <RunningPanel activities={data.activities} goals={data.goals} period={period} />
+          <RunPlanCard />
           <ActivityLog activities={data.activities} />
           <LastSynced
             activities={data.activities}
