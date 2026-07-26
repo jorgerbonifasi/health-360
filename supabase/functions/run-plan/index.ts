@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const [actRes, goalsRes] = await Promise.all([
       client
         .from("activities")
-        .select("type, type_group, name, started_at, distance_m, moving_time_s, avg_hr")
+        .select("type, type_group, name, started_at, distance_m, moving_time_s, avg_hr, max_hr")
         .gte("started_at", since)
         .order("started_at", { ascending: false }),
       client.from("goals").select("metric, target_value").eq("metric", "weekly_running_km_goal").maybeSingle(),
@@ -65,6 +65,8 @@ Deno.serve(async (req) => {
     let last7RunKm = 0;
     let last7ActiveHrs = 0;
     let lastRunAt: number | null = null;
+    const runAvgHrs: number[] = [];
+    const runMaxHrs: number[] = [];
     const sevenAgo = now.getTime() - 7 * 86400000;
 
     for (const a of activities) {
@@ -77,15 +79,24 @@ Deno.serve(async (req) => {
         if (isRun) last7RunKm += km;
       }
       if (isRun && (lastRunAt == null || t > lastRunAt)) lastRunAt = t;
+      if (isRun && a.avg_hr) runAvgHrs.push(Number(a.avg_hr));
+      if (isRun && a.max_hr) runMaxHrs.push(Number(a.max_hr));
 
       const day = new Date(a.started_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
       const parts = [`${day}: ${group}`];
       if (km > 0) parts.push(`${km.toFixed(1)}km`);
       parts.push(fmtDur(a.moving_time_s ?? 0));
       if (isRun) parts.push(`@ ${fmtPace(paceMinKm(a.distance_m ?? 0, a.moving_time_s ?? 0))}`);
-      if (a.avg_hr) parts.push(`${Math.round(a.avg_hr)}bpm`);
+      if (a.avg_hr) {
+        parts.push(a.max_hr ? `HR ${Math.round(a.avg_hr)}/${Math.round(a.max_hr)}` : `HR ${Math.round(a.avg_hr)}`);
+      }
       lines.push("- " + parts.join(" · "));
     }
+
+    const mean = (xs: number[]) => (xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : null);
+    const avgRunHr = mean(runAvgHrs);
+    const typicalMaxHr = mean(runMaxHrs);
+    const maxHr = Deno.env.get("MAX_HR"); // optional: athlete's known max HR for zone-based targets
 
     const daysSinceRun = lastRunAt == null ? null : Math.floor((now.getTime() - lastRunAt) / 86400000);
     const raceGoal = Deno.env.get("RACE_GOAL");
@@ -95,6 +106,8 @@ Deno.serve(async (req) => {
       weeklyRunGoal ? `Weekly running goal: ${weeklyRunGoal} km.` : null,
       `Last 7 days: ${last7RunKm.toFixed(1)} km running, ${last7ActiveHrs.toFixed(1)} h total activity.`,
       daysSinceRun == null ? "No runs in the last 14 days." : `Days since last run: ${daysSinceRun}.`,
+      avgRunHr ? `Recent runs (14d) heart rate: avg ~${avgRunHr} bpm${typicalMaxHr ? `, typical max ~${typicalMaxHr} bpm` : ""}.` : null,
+      maxHr ? `Athlete's known max heart rate: ${maxHr} bpm.` : "Max heart rate unknown — infer HR zones from recent run HR.",
       raceGoal ? `Race goal: ${raceGoal}.` : "No specific race goal — train for general fitness and the weekly km goal.",
       feel ? `Athlete note on how they feel today: "${feel}".` : "No note on how they feel today.",
       "",
@@ -108,10 +121,14 @@ Deno.serve(async (req) => {
       "today. Consider training load and rest — a recovery/easy day or full rest is a valid answer if " +
       "warranted. If a race goal is given, periodize toward it (build vs. taper). Never invent data or " +
       "activities that aren't listed.\n\n" +
-      "Respond in plain text (no markdown symbols), in this shape, ~5 short lines:\n" +
+      "Set Target HR to match the workout intensity. If the athlete's max heart rate is given, use " +
+      "standard zones (recovery/easy ~65–75%, tempo ~80–88%, intervals ~90–95% of max). If it is " +
+      "unknown, estimate the range from their recent run heart rates. Use '—' for a rest day.\n\n" +
+      "Respond in plain text (no markdown symbols), in this shape, ~6 short lines:\n" +
       "Workout: <easy | recovery | tempo | intervals | long | rest>\n" +
       "Distance: <km, or '—' for rest>\n" +
       "Target pace: <min/km range, or '—'>\n" +
+      "Target HR: <bpm range, or '—' for rest>\n" +
       "Why: <1–2 sentences tied to their recent load / recovery / feel>\n" +
       "Reminder: <one short cue, e.g. warm-up, hydration, form>";
 
