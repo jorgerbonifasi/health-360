@@ -89,12 +89,27 @@ the apps, or re-run `supabase secrets set` later).
 ## 3. Deploy the Edge Functions
 
 ```bash
-supabase functions deploy oauth-callback strava-webhook withings-webhook apple-health reconcile compute-scores
+supabase functions deploy oauth-callback strava-webhook withings-webhook apple-health reconcile compute-scores run-plan update-goals
 ```
 
 `config.toml` already disables JWT verification for the four public functions (webhooks + OAuth
 callback); they enforce their own auth. `reconcile` and `compute-scores` keep JWT on and are
-only called by the cron job with the service-role bearer.
+only called by the cron job with the service-role bearer. `run-plan` and `update-goals` also keep
+JWT on — the dashboard invokes them with the anon key.
+
+### Deploying without a terminal
+
+`.github/workflows/deploy-functions.yml` does the same deploy from GitHub Actions, so you can ship
+from a browser (phone or tablet included). One-time setup, in **Settings → Secrets and variables →
+Actions**:
+
+| Secret | Where to find it |
+| --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | supabase.com → account menu → **Access Tokens** → generate one |
+| `SUPABASE_PROJECT_REF` | **Project Settings → General → Reference ID** |
+
+Then: **Actions** tab → *Deploy Edge Functions* → **Run workflow** → pick the branch, and enter
+either a space-separated list of function names or `all`. It defaults to `run-plan`.
 
 ## 4. Connect Strava
 

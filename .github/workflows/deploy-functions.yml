@@ -1,0 +1,47 @@
+name: Deploy Edge Functions
+
+# Manual trigger only — open the repo's Actions tab, pick this workflow, choose the branch, and
+# press "Run workflow". Works from a phone or iPad; no terminal, Docker or CLI needed.
+#
+# Requires two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN — supabase.com → account menu → Access Tokens → Generate new token
+#   SUPABASE_PROJECT_REF  — Project Settings → General → Reference ID (the "abcdefgh" in your
+#                           project URL). Not a secret as such, but kept here for convenience.
+#
+# verify_jwt settings come from supabase/config.toml in the checkout, so the public webhook
+# functions keep JWT verification disabled exactly as they do from a local deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: 'Space-separated function names, or "all"'
+        required: true
+        default: run-plan
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          # Via env, not inline ${{ }}, so the input can't be injected into the shell.
+          FUNCTIONS_INPUT: ${{ inputs.functions }}
+        run: |
+          set -euo pipefail
+          if [ "$FUNCTIONS_INPUT" = "all" ]; then
+            FUNCTIONS="apple-health compute-scores oauth-callback reconcile run-plan strava-webhook update-goals withings-webhook"
+          else
+            FUNCTIONS="$FUNCTIONS_INPUT"
+          fi
+          echo "Deploying: $FUNCTIONS"
+          # shellcheck disable=SC2086  # intentional word splitting: one arg per function
+          supabase functions deploy $FUNCTIONS --project-ref "$PROJECT_REF"
