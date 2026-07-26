@@ -54,12 +54,12 @@ export function weightSummary(
   return { latest: round1(last.weight), weeklyDelta: series.length > 1 ? round1(delta) : null };
 }
 
-// Current streak: consecutive days (ending today or yesterday) with steps >= goal.
-export function stepStreak(steps: DailyStep[], goal: number): number {
+// Current streak: consecutive days (ending on `now` or the day before) with steps >= goal.
+export function stepStreak(steps: DailyStep[], goal: number, now: Date = new Date()): number {
   const byDate = new Map(steps.map((s) => [s.date, s.steps]));
   let streak = 0;
-  // Allow the streak to be "alive" if today has no data yet but yesterday met the goal.
-  let cursor = new Date();
+  // Allow the streak to be "alive" if the anchor day has no data yet but the day before met the goal.
+  let cursor = new Date(now);
   if (!byDate.has(dateKey(cursor))) cursor = new Date(cursor.getTime() - DAY_MS);
   for (let i = 0; i < 400; i++) {
     const key = dateKey(cursor);
@@ -209,6 +209,65 @@ export function pctDelta(current: number, previous: number): number | null {
 
 export function average(nums: number[]): number | null {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+}
+
+// ---------------------------------------------------------------------------
+// Time-machine navigation: an `anchor` moment shifted `back` periods from now,
+// used as the `now` argument for every relative computation so the whole
+// dashboard reads "as of" a past period.
+// ---------------------------------------------------------------------------
+
+export function anchorDate(period: Period, back: number, now: Date = new Date()): Date {
+  return addPeriods(now, period, -back);
+}
+
+// How far back you can step (kept within the ~13-month data window).
+export function maxBack(period: Period): number {
+  return period === "day" ? 90 : period === "week" ? 52 : 12;
+}
+
+// Local YYYY-MM-DD for the day containing `d` (avoids UTC off-by-one).
+export function localDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Last calendar day (local midnight) of the bucket containing `anchor`.
+export function periodEnd(period: Period, anchor: Date): Date {
+  const start = bucketStart(anchor, period);
+  if (period === "day") return start;
+  if (period === "week") return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  return new Date(start.getFullYear(), start.getMonth() + 1, 0); // last day of month
+}
+
+// "Last week · Jul 13–19", "Yesterday · Jul 22", "June" — relative word + date/range.
+export function periodLabel(period: Period, back: number, now: Date = new Date()): string {
+  const anchor = anchorDate(period, back, now);
+  if (period === "day") {
+    const d = bucketStart(anchor, "day");
+    const rel = back === 0 ? "Today" : back === 1 ? "Yesterday" : `${back} days ago`;
+    return `${rel} · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }
+  if (period === "week") {
+    const start = bucketStart(anchor, "week");
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+    const rel = back === 0 ? "This week" : back === 1 ? "Last week" : `${back} weeks ago`;
+    const s = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const range =
+      start.getMonth() === end.getMonth()
+        ? `${s}–${end.getDate()}`
+        : `${s} – ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    return `${rel} · ${range}`;
+  }
+  const start = bucketStart(anchor, "month");
+  const rel = back === 0 ? "This month" : back === 1 ? "Last month" : `${back} months ago`;
+  const name = start.toLocaleDateString(undefined, {
+    month: "long",
+    ...(start.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+  });
+  return `${rel} · ${name}`;
 }
 
 // ---------------------------------------------------------------------------

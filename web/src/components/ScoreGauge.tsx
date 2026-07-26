@@ -8,6 +8,8 @@ import {
   dayLabel,
   goalDirection,
   goalValue,
+  localDateKey,
+  periodEnd,
   periodNoun,
   pctDelta,
   previousLabel,
@@ -121,20 +123,24 @@ export function ScoreGauge({
   scores,
   goals,
   period,
+  anchor,
 }: {
   scores: DailyScore[];
   goals: Goal[];
   period: Period;
+  anchor: Date;
 }) {
-  // Headline = the most recent *complete* day (today is in-progress: partial steps would make
-  // Movement read low every morning). Falls back to the latest score if that's all there is.
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const complete = scores.filter((s) => s.date < todayKey);
+  // Headline = the last complete day within the viewed period (today is in-progress, so at the
+  // current period we exclude it). Falls back to the latest score if that's all there is.
+  const yesterdayKey = localDateKey(new Date(Date.now() - 86400000));
+  const periodEndKey = localDateKey(periodEnd(period, anchor));
+  const cutoff = periodEndKey < yesterdayKey ? periodEndKey : yesterdayKey;
+  const complete = scores.filter((s) => s.date <= cutoff);
   const today = complete.length ? complete[complete.length - 1] : scores[scores.length - 1];
   const total = today ? Math.round(today.total) : null;
 
-  // Sparkline: average score per bucket over the recent buckets.
-  const buckets = recentBuckets(period, bucketCount(period));
+  // Sparkline: average score per bucket over the recent buckets ending at the anchor.
+  const buckets = recentBuckets(period, bucketCount(period), anchor);
   const spark = buckets.map((b) => {
     const inB = scores.filter((s) => {
       const t = scoreEpoch(s);
@@ -143,9 +149,9 @@ export function ScoreGauge({
     return { label: b.label, total: average(inB.map((s) => s.total)) };
   });
 
-  // WoW/MoM delta: current trailing-window avg vs previous.
+  // WoW/MoM delta: viewed-period avg vs previous, relative to the anchor.
   const avgInBounds = (offset: number) => {
-    const { start, end } = trailingBounds(period, offset);
+    const { start, end } = trailingBounds(period, offset, anchor);
     return average(scores.filter((s) => scoreEpoch(s) >= start && scoreEpoch(s) < end).map((s) => s.total));
   };
   const cur = avgInBounds(0);

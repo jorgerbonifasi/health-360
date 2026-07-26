@@ -4,10 +4,10 @@ import {
   average,
   goalDirection,
   pctDelta,
+  periodEnd,
   round1,
   toDisplayWeight,
   trailingBounds,
-  weightSummary,
   WEIGHT_UNIT,
   type Period,
 } from "../lib/metrics.ts";
@@ -31,21 +31,25 @@ export function SummaryHeader({
   activities,
   goals,
   period,
+  anchor,
 }: {
   weights: WeightLog[];
   steps: DailyStep[];
   activities: Activity[];
   goals: Goal[];
   period: Period;
+  anchor: Date;
 }) {
   const win = period === "day" ? "today" : period === "week" ? "7d" : "30d";
   const within = (t: number, offset: number) => {
-    const { start, end } = trailingBounds(period, offset);
+    const { start, end } = trailingBounds(period, offset, anchor);
     return t >= start && t < end;
   };
 
-  // Weight — headline is the latest reading; delta is the trailing-avg change (kg).
-  const latest = weightSummary(weights).latest;
+  // Weight — headline is the latest reading as of the viewed period; delta is the trailing-avg change.
+  const asOf = periodEnd(period, anchor).getTime() + 86400000; // end of the viewed period's last day
+  const asOfWeighins = weights.filter((w) => new Date(w.measured_at).getTime() < asOf);
+  const latest = asOfWeighins.length ? asOfWeighins[asOfWeighins.length - 1].weight_kg : null;
   const weightAvg = (offset: number) =>
     average(weights.filter((w) => within(new Date(w.measured_at).getTime(), offset)).map((w) => w.weight_kg));
   const wCur = weightAvg(0);

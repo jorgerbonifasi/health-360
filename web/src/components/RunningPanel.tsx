@@ -23,8 +23,8 @@ import {
 } from "../lib/metrics.ts";
 
 // Running km (bars) + average pace (line) per day / week / month. Half-marathon training view.
-function buildRows(activities: Activity[], period: Period) {
-  const buckets = recentBuckets(period, bucketCount(period));
+function buildRows(activities: Activity[], period: Period, anchor: Date) {
+  const buckets = recentBuckets(period, bucketCount(period), anchor);
   const agg = buckets.map(() => ({ dist: 0, time: 0 }));
   for (const a of activities) {
     if (a.type_group !== "Run") continue;
@@ -44,12 +44,14 @@ export function RunningPanel({
   activities,
   goals,
   period,
+  anchor,
 }: {
   activities: Activity[];
   goals: Goal[];
   period: Period;
+  anchor: Date;
 }) {
-  const data = buildRows(activities, period);
+  const data = buildRows(activities, period, anchor);
   const hasRuns = data.some((d) => d.km > 0);
   // Weekly goal scaled to the bucket (day = /7, month ≈ ×4.345 weeks).
   const weeklyGoal = goalValue(goals, "weekly_running_km_goal", NaN);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useHealthData } from "./hooks/useHealthData.ts";
-import type { Period } from "./lib/metrics.ts";
+import { anchorDate, maxBack, periodLabel, type Period } from "./lib/metrics.ts";
 import { PeriodToggle } from "./components/PeriodToggle.tsx";
 import { RefreshButton } from "./components/RefreshButton.tsx";
 import { SettingsPanel } from "./components/SettingsPanel.tsx";
@@ -17,7 +17,15 @@ import { LastSynced } from "./components/LastSynced.tsx";
 export default function App() {
   const { data, loading, error, refetch } = useHealthData();
   const [period, setPeriod] = useState<Period>("week");
+  const [back, setBack] = useState(0); // periods back from now (0 = current)
   const [showSettings, setShowSettings] = useState(false);
+
+  // Switching Day/Week/Month resets to the current period.
+  const changePeriod = (p: Period) => {
+    setPeriod(p);
+    setBack(0);
+  };
+  const anchor = anchorDate(period, back);
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-2xl px-4 pb-16 pt-6">
@@ -42,7 +50,32 @@ export default function App() {
             </button>
           </div>
         </div>
-        <PeriodToggle period={period} onChange={setPeriod} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <PeriodToggle period={period} onChange={changePeriod} />
+          <nav className="flex items-center gap-1.5 text-xs text-slate-400">
+            <button
+              type="button"
+              onClick={() => setBack((b) => Math.min(maxBack(period), b + 1))}
+              disabled={back >= maxBack(period)}
+              aria-label="Previous period"
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 ring-1 ring-white/10 transition hover:text-white disabled:opacity-40"
+            >
+              ‹
+            </button>
+            <span className="min-w-[7.5rem] text-center tabular-nums text-slate-300">
+              {periodLabel(period, back)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBack((b) => Math.max(0, b - 1))}
+              disabled={back === 0}
+              aria-label="Next period"
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 ring-1 ring-white/10 transition hover:text-white disabled:opacity-40"
+            >
+              ›
+            </button>
+          </nav>
+        </div>
       </header>
 
       {showSettings && data && (
@@ -64,18 +97,19 @@ export default function App() {
 
       {data && (
         <div className="space-y-4">
-          <ScoreGauge scores={data.scores} goals={data.goals} period={period} />
+          <ScoreGauge scores={data.scores} goals={data.goals} period={period} anchor={anchor} />
           <SummaryHeader
             weights={data.weights}
             steps={data.steps}
             activities={data.activities}
             goals={data.goals}
             period={period}
+            anchor={anchor}
           />
-          <WeightChart weights={data.weights} goals={data.goals} period={period} />
-          <StepsChart steps={data.steps} goals={data.goals} period={period} />
-          <ActivityMixChart activities={data.activities} period={period} />
-          <RunningPanel activities={data.activities} goals={data.goals} period={period} />
+          <WeightChart weights={data.weights} goals={data.goals} period={period} anchor={anchor} />
+          <StepsChart steps={data.steps} goals={data.goals} period={period} anchor={anchor} />
+          <ActivityMixChart activities={data.activities} period={period} anchor={anchor} />
+          <RunningPanel activities={data.activities} goals={data.goals} period={period} anchor={anchor} />
           <RunPlanCard />
           <ActivityLog activities={data.activities} />
           <LastSynced

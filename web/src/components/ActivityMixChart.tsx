@@ -13,8 +13,8 @@ import { ACTIVITY_GROUPS, GROUP_COLORS, type Activity } from "../lib/types.ts";
 import { bucketCount, bucketIndexOf, periodNoun, recentBuckets, round1, type Period } from "../lib/metrics.ts";
 
 // Stacked active-hours-by-sport bars, bucketed by day / week / month.
-function buildRows(activities: Activity[], period: Period) {
-  const buckets = recentBuckets(period, bucketCount(period));
+function buildRows(activities: Activity[], period: Period, anchor: Date) {
+  const buckets = recentBuckets(period, bucketCount(period), anchor);
   const rows = buckets.map((b) => {
     const row: Record<string, number | string> = { label: b.label };
     for (const g of ACTIVITY_GROUPS) row[g] = 0;
@@ -34,11 +34,13 @@ function buildRows(activities: Activity[], period: Period) {
 export function ActivityMixChart({
   activities,
   period,
+  anchor,
 }: {
   activities: Activity[];
   period: Period;
+  anchor: Date;
 }) {
-  const data = buildRows(activities, period);
+  const data = buildRows(activities, period, anchor);
 
   return (
     <Card title="Training load" subtitle={`Active hours by sport · last ${bucketCount(period)} ${periodNoun(period)}s`}>

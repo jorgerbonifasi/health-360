@@ -26,13 +26,15 @@ export function StepsChart({
   steps,
   goals,
   period,
+  anchor,
 }: {
   steps: DailyStep[];
   goals: Goal[];
   period: Period;
+  anchor: Date;
 }) {
   const dailyGoal = goalValue(goals, "daily_step_goal", 10000);
-  const buckets = recentBuckets(period, bucketCount(period));
+  const buckets = recentBuckets(period, bucketCount(period), anchor);
   const totals = buckets.map(() => 0);
   for (const s of steps) {
     const idx = bucketIndexOf(buckets, new Date(s.date + "T00:00:00").getTime());
@@ -40,7 +42,7 @@ export function StepsChart({
   }
   const data = buckets.map((b, i) => ({ label: b.label, steps: totals[i] }));
   const periodGoal = dailyGoal * (period === "day" ? 1 : period === "week" ? 7 : 30);
-  const streak = stepStreak(steps, dailyGoal);
+  const streak = stepStreak(steps, dailyGoal, anchor);
 
   return (
     <Card
