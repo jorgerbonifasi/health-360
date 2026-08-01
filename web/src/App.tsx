@@ -50,7 +50,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <PeriodToggle period={period} onChange={changePeriod} />
           <nav className="flex items-center gap-1.5 text-xs text-slate-400">
             <button
