@@ -3,7 +3,7 @@
 // look realistic across ~13 months (so the Month view has data too). Never used when
 // VITE_USE_MOCK is unset.
 import type { HealthData } from "../hooks/useHealthData.ts";
-import type { ActivityGroup } from "./types.ts";
+import type { ActivityGroup, RunPlan } from "./types.ts";
 
 const DAY = 86400000;
 const HISTORY_DAYS = 400;
@@ -90,5 +90,89 @@ export function buildMockData(): HealthData {
     { metric: "weekly_running_km_goal", target_value: 40, direction: "up", period: "week" },
   ];
 
-  return { scores, weights, steps, activities, goals };
+  // Three coach plans: today's fresh, yesterday's awaiting a verdict, and the day before
+  // already reviewed — i.e. exactly the state just before you press the review button.
+  const runPlans: RunPlan[] = [
+    {
+      date: dateKey(0),
+      plan_text: [
+        "Workout: easy",
+        "Distance: 8 km",
+        "Target pace: 5:40-5:55/km",
+        "Target HR: 138-150 bpm",
+        "Why: You have run three days in a row, so keep today conversational and let the legs come back.",
+        "Reminder: Start slower than feels right for the first kilometre.",
+      ].join("\n"),
+      workout_type: "easy",
+      target_distance_km: 8,
+      target_pace_min_km_low: 5.67,
+      target_pace_min_km_high: 5.92,
+      target_hr_low: 138,
+      target_hr_high: 150,
+      feel: null,
+      generated_at: iso(0, 7),
+      reviewed_at: null,
+      review_text: null,
+      adherence: null,
+      actual_distance_km: null,
+      actual_pace_min_km: null,
+      actual_avg_hr: null,
+    },
+    {
+      date: dateKey(1),
+      plan_text: [
+        "Workout: tempo",
+        "Distance: 6 km",
+        "Target pace: 4:55-5:05/km",
+        "Target HR: 158-168 bpm",
+        "Why: You have had two easy days, so this is the week's quality session.",
+        "Reminder: Two kilometres of warm-up before you touch tempo pace.",
+      ].join("\n"),
+      workout_type: "tempo",
+      target_distance_km: 6,
+      target_pace_min_km_low: 4.92,
+      target_pace_min_km_high: 5.08,
+      target_hr_low: 158,
+      target_hr_high: 168,
+      feel: null,
+      generated_at: iso(1, 7),
+      reviewed_at: null,
+      review_text: null,
+      adherence: null,
+      actual_distance_km: null,
+      actual_pace_min_km: null,
+      actual_avg_hr: null,
+    },
+    {
+      date: dateKey(2),
+      plan_text: [
+        "Workout: easy",
+        "Distance: 7 km",
+        "Target pace: 5:45-6:00/km",
+        "Target HR: 135-148 bpm",
+        "Why: Second run of the week off a hard weekend - keep it genuinely easy.",
+        "Reminder: Breathe through your nose if you can.",
+      ].join("\n"),
+      workout_type: "easy",
+      target_distance_km: 7,
+      target_pace_min_km_low: 5.75,
+      target_pace_min_km_high: 6,
+      target_hr_low: 135,
+      target_hr_high: 148,
+      feel: "legs a bit heavy",
+      generated_at: iso(2, 7),
+      reviewed_at: iso(2, 20),
+      review_text:
+        "You were asked for 7 km easy at 5:45-6:00/km and ran 9.2 km at 5:12/km with an average " +
+        "heart rate of 162 - that is a tempo effort wearing an easy run's clothes. It felt good, " +
+        "but easy days exist to make the hard days possible. Next time hold the first kilometre " +
+        "back and let the pace settle rather than chasing it.",
+      adherence: "harder",
+      actual_distance_km: 9.2,
+      actual_pace_min_km: 5.2,
+      actual_avg_hr: 162,
+    },
+  ];
+
+  return { scores, weights, steps, activities, goals, runPlans };
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
-import type { Activity, DailyScore, DailyStep, Goal, WeightLog } from "../lib/types.ts";
+import type { Activity, DailyScore, DailyStep, Goal, RunPlan, WeightLog } from "../lib/types.ts";
 
 export interface HealthData {
   scores: DailyScore[];
@@ -8,6 +8,7 @@ export interface HealthData {
   steps: DailyStep[];
   activities: Activity[];
   goals: Goal[];
+  runPlans: RunPlan[];
 }
 
 interface State {
@@ -42,7 +43,7 @@ async function fetchAll(): Promise<HealthData> {
     return buildMockData();
   }
 
-  const [scores, weights, steps, activities, goals] = await Promise.all([
+  const [scores, weights, steps, activities, goals, runPlans] = await Promise.all([
     supabase
       .from("daily_scores")
       .select("date, total, movement_score, exercise_score, weight_score, computed_at")
@@ -66,10 +67,18 @@ async function fetchAll(): Promise<HealthData> {
       .gte("started_at", daysAgoISO(WINDOW_DAYS))
       .order("started_at", { ascending: false }),
     supabase.from("goals").select("metric, target_value, direction, period"),
+    // Only the recent ones — the card shows today's plan and the latest review.
+    supabase
+      .from("run_plans")
+      .select(
+        "date, plan_text, workout_type, target_distance_km, target_pace_min_km_low, target_pace_min_km_high, target_hr_low, target_hr_high, feel, generated_at, reviewed_at, review_text, adherence, actual_distance_km, actual_pace_min_km, actual_avg_hr",
+      )
+      .order("date", { ascending: false })
+      .limit(30),
   ]);
 
   const firstError =
-    scores.error || weights.error || steps.error || activities.error || goals.error;
+    scores.error || weights.error || steps.error || activities.error || goals.error || runPlans.error;
   if (firstError) throw firstError;
 
   return {
@@ -78,6 +87,7 @@ async function fetchAll(): Promise<HealthData> {
     steps: (steps.data ?? []) as DailyStep[],
     activities: (activities.data ?? []) as Activity[],
     goals: (goals.data ?? []) as Goal[],
+    runPlans: (runPlans.data ?? []) as RunPlan[],
   };
 }
 

@@ -4,29 +4,58 @@
 // role and calls the Anthropic API with a server-side key (ANTHROPIC_API_KEY) — the key never
 // reaches the browser. An optional RACE_GOAL secret (free text, e.g. "half-marathon, Sept 20,
 // sub-1:45") lets the coach periodize.
+//
+// The plan comes back as structured JSON (output_config.format) rather than prose, so the
+// targets can be stored as real columns and graded later by run-review. The six-line card text
+// is rendered from those same fields, so what you read and what gets graded can't drift apart.
+// Every plan is persisted to run_plans (upsert on date — regenerating replaces today's plan).
 
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { getServiceClient } from "../_shared/supabase.ts";
 import { json, handlePreflight } from "../_shared/cors.ts";
 import { normalizeActivityType } from "../_shared/normalizeActivity.ts";
+import { dateKey, fmtDur, fmtPace, paceMinKm, renderPlanText, utcMidnight } from "../_shared/coach.ts";
 
 const MODEL = "claude-opus-4-8";
 
-function paceMinKm(distanceM: number, movingS: number): number | null {
-  const km = distanceM / 1000;
-  return km > 0 ? movingS / 60 / km : null;
-}
-function fmtPace(minKm: number | null): string {
-  if (minKm == null || !isFinite(minKm)) return "—";
-  const m = Math.floor(minKm);
-  const s = Math.round((minKm - m) * 60);
-  return `${m}:${String(s).padStart(2, "0")}/km`;
-}
-function fmtDur(s: number): string {
-  const h = Math.floor(s / 3600);
-  const m = Math.round((s % 3600) / 60);
-  return h > 0 ? `${h}h${m}m` : `${m}m`;
-}
+// Claude fills exactly this shape. Nullable fields are null on a rest day.
+const PLAN_SCHEMA = {
+  type: "object",
+  properties: {
+    workout_type: {
+      type: "string",
+      enum: ["easy", "recovery", "tempo", "intervals", "long", "rest"],
+    },
+    distance_km: {
+      type: ["number", "null"],
+      description: "Target distance in kilometres. Null for a rest day.",
+    },
+    pace_min_km_low: {
+      type: ["number", "null"],
+      description:
+        "Fast end of the target pace, in decimal minutes per kilometre (5.5 means 5:30/km). Null for a rest day.",
+    },
+    pace_min_km_high: {
+      type: ["number", "null"],
+      description: "Slow end of the target pace, same units. Null for a rest day.",
+    },
+    hr_low: { type: ["integer", "null"], description: "Low end of target heart rate in bpm. Null for a rest day." },
+    hr_high: { type: ["integer", "null"], description: "High end of target heart rate in bpm. Null for a rest day." },
+    why: { type: "string", description: "1–2 sentences tied to recent load, recovery or how they feel." },
+    reminder: { type: "string", description: "One short cue, e.g. warm-up, hydration, form." },
+  },
+  required: [
+    "workout_type",
+    "distance_km",
+    "pace_min_km_low",
+    "pace_min_km_high",
+    "hr_low",
+    "hr_high",
+    "why",
+    "reminder",
+  ],
+  additionalProperties: false,
+} as const;
 
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
@@ -121,16 +150,11 @@ Deno.serve(async (req) => {
       "today. Consider training load and rest — a recovery/easy day or full rest is a valid answer if " +
       "warranted. If a race goal is given, periodize toward it (build vs. taper). Never invent data or " +
       "activities that aren't listed.\n\n" +
-      "Set Target HR to match the workout intensity. If the athlete's max heart rate is given, use " +
-      "standard zones (recovery/easy ~65–75%, tempo ~80–88%, intervals ~90–95% of max). If it is " +
-      "unknown, estimate the range from their recent run heart rates. Use '—' for a rest day.\n\n" +
-      "Respond in plain text (no markdown symbols), in this shape, ~6 short lines:\n" +
-      "Workout: <easy | recovery | tempo | intervals | long | rest>\n" +
-      "Distance: <km, or '—' for rest>\n" +
-      "Target pace: <min/km range, or '—'>\n" +
-      "Target HR: <bpm range, or '—' for rest>\n" +
-      "Why: <1–2 sentences tied to their recent load / recovery / feel>\n" +
-      "Reminder: <one short cue, e.g. warm-up, hydration, form>";
+      "Set the target heart rate to match the workout intensity. If the athlete's max heart rate is " +
+      "given, use standard zones (recovery/easy ~65–75%, tempo ~80–88%, intervals ~90–95% of max). If " +
+      "it is unknown, estimate the range from their recent run heart rates.\n\n" +
+      "For a rest day set workout_type to 'rest' and leave distance_km, both pace fields and both HR " +
+      "fields null. Pace is decimal minutes per kilometre: 5.5 means 5:30/km.";
 
     const anthropic = new Anthropic({ apiKey });
     const msg = await anthropic.messages.create({
@@ -138,16 +162,45 @@ Deno.serve(async (req) => {
       max_tokens: 2048,
       thinking: { type: "adaptive" },
       system,
+      output_config: { format: { type: "json_schema", schema: PLAN_SCHEMA } },
       messages: [{ role: "user", content: context }],
     });
 
-    const plan = msg.content
-      .filter((b: { type: string }) => b.type === "text")
-      .map((b: { text: string }) => b.text)
-      .join("\n")
-      .trim();
+    // output_config.format guarantees a text block holding valid JSON.
+    const raw = msg.content.find((b: { type: string }) => b.type === "text");
+    if (!raw) throw new Error("Claude returned no plan");
+    const p = JSON.parse((raw as { text: string }).text);
 
-    return json({ plan, model: MODEL, generated_at: now.toISOString() }, 200);
+    const planText = renderPlanText(p);
+    const today = dateKey(utcMidnight(now));
+
+    const { error: upsertError } = await client.from("run_plans").upsert({
+      date: today,
+      plan_text: planText,
+      workout_type: p.workout_type,
+      target_distance_km: p.distance_km,
+      target_pace_min_km_low: p.pace_min_km_low,
+      target_pace_min_km_high: p.pace_min_km_high,
+      target_hr_low: p.hr_low,
+      target_hr_high: p.hr_high,
+      why: p.why,
+      reminder: p.reminder,
+      feel: feel || null,
+      model: MODEL,
+      generated_at: now.toISOString(),
+      // Regenerating today's plan invalidates any review already attached to it.
+      reviewed_at: null,
+      review_text: null,
+      adherence: null,
+      actual_distance_km: null,
+      actual_pace_min_km: null,
+      actual_avg_hr: null,
+      reviewed_strava_ids: null,
+      review_model: null,
+    }, { onConflict: "date" });
+    if (upsertError) throw new Error(`Failed to save plan: ${upsertError.message}`);
+
+    return json({ plan: planText, date: today, structured: p, model: MODEL, generated_at: now.toISOString() }, 200);
   } catch (e) {
     console.error("run-plan error", e);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);

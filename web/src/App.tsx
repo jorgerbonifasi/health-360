@@ -110,7 +110,7 @@ export default function App() {
           <StepsChart steps={data.steps} goals={data.goals} period={period} anchor={anchor} />
           <ActivityMixChart activities={data.activities} period={period} anchor={anchor} />
           <RunningPanel activities={data.activities} goals={data.goals} period={period} anchor={anchor} />
-          <RunPlanCard />
+          <RunPlanCard plans={data.runPlans} onChanged={refetch} />
           <ActivityLog activities={data.activities} />
           <LastSynced
             activities={data.activities}
