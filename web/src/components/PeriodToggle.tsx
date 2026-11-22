@@ -14,14 +14,14 @@ export function PeriodToggle({
     { value: "month", label: "Month" },
   ];
   return (
-    <div className="inline-flex rounded-lg bg-slate-800 p-0.5 ring-1 ring-white/10">
+    <div className="inline-flex rounded-lg bg-surface p-0.5 ring-1 ring-white/10">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
           className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-            period === o.value ? "bg-slate-600 text-white" : "text-slate-400 hover:text-slate-200"
+            period === o.value ? "bg-raised text-white" : "text-slate-400 hover:text-slate-200"
           }`}
         >
           {o.label}

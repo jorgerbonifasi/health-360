@@ -32,7 +32,7 @@ export function RefreshButton({ onRefreshed }: { onRefreshed: () => Promise<void
       disabled={busy}
       title={error ? `Sync failed: ${error}` : "Sync Strava + Withings"}
       aria-label="Sync data"
-      className={`flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-base ring-1 ring-white/10 transition hover:text-white disabled:opacity-60 ${
+      className={`flex h-9 w-9 items-center justify-center rounded-full bg-surface text-base ring-1 ring-white/10 transition hover:text-white disabled:opacity-60 ${
         error ? "text-rose-400" : "text-slate-300"
       }`}
     >

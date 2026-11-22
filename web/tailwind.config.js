@@ -8,6 +8,11 @@ export default {
         movement: "#3b82f6", // blue
         exercise: "#f97316", // orange
         weight: "#10b981", // emerald
+        // App chrome: near-black canvas, raised card surface, one lime accent.
+        canvas: "#000000",
+        surface: "#1c1c1e",
+        raised: "#2c2c2e",
+        accent: "#a3e635",
       },
     },
   },

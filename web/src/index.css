@@ -8,9 +8,14 @@
 
 body {
   margin: 0;
-  background-color: #0f172a; /* slate-900 */
+  background-color: #000000;
   color: #e2e8f0; /* slate-200 */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Keep content clear of the iPhone home indicator when installed to the Home Screen. */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }

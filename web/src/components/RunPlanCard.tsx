@@ -139,7 +139,7 @@ export function RunPlanCard({
             type="button"
             onClick={() => review(pending.date)}
             disabled={reviewing}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-800 py-2 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition hover:text-white disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-raised py-2.5 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition hover:text-white disabled:opacity-60"
           >
             {reviewing ? (
               <>
@@ -156,7 +156,7 @@ export function RunPlanCard({
             type="button"
             onClick={() => review(todayPending.date)}
             disabled={reviewing}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-800 py-2 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition hover:text-white disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-raised py-2.5 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition hover:text-white disabled:opacity-60"
           >
             {reviewing ? (
               <>
@@ -173,7 +173,7 @@ export function RunPlanCard({
           value={feel}
           onChange={(e) => setFeel(e.target.value)}
           placeholder="How do you feel today? (optional — e.g. legs sore, slept badly)"
-          className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500 focus:outline-none focus:ring-blue-500"
+          className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500 focus:outline-none focus:ring-accent"
           onKeyDown={(e) => e.key === "Enter" && getPlan()}
         />
 
@@ -181,7 +181,7 @@ export function RunPlanCard({
           type="button"
           onClick={getPlan}
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-sm font-semibold text-black transition hover:brightness-110 disabled:opacity-60"
         >
           {loading ? (
             <>

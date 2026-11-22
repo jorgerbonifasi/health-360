@@ -10,10 +10,10 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl bg-slate-800/60 p-4 shadow-lg ring-1 ring-white/5">
+    <section className="rounded-2xl bg-surface p-4 ring-1 ring-white/5">
       {title && (
         <header className="mb-3">
-          <h2 className="text-sm font-semibold text-slate-200">{title}</h2>
+          <h2 className="text-base font-semibold text-slate-100">{title}</h2>
           {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
         </header>
       )}
