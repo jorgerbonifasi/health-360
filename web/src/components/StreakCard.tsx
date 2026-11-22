@@ -1,6 +1,8 @@
 import type { Activity } from "../lib/types.ts";
 import { BADGES, FREEZE_EVERY, MAX_FREEZES, MIN_RUNS_PER_WEEK, streakInfo } from "../lib/stats.ts";
 
+const runWord = (n: number) => (n === 1 ? "run" : "runs");
+
 const MEDAL: Record<number, string> = {
   4: "text-amber-600",
   12: "text-slate-300",
@@ -33,7 +35,7 @@ export function StreakCard({ activities, compact = false }: { activities: Activi
         <div className="min-w-0 flex-1">
           <p className="text-lg font-semibold text-slate-100">{s.current} week streak</p>
           <p className="text-sm text-slate-400">
-            {Math.min(s.thisWeekRuns, MIN_RUNS_PER_WEEK)} / {MIN_RUNS_PER_WEEK} runs this week · Best {s.best}
+            {Math.min(s.thisWeekRuns, MIN_RUNS_PER_WEEK)} / {MIN_RUNS_PER_WEEK} {runWord(MIN_RUNS_PER_WEEK)} this week · Best {s.best}
           </p>
         </div>
         <div className="flex gap-1">{freezeChips}</div>
@@ -59,7 +61,7 @@ export function StreakCard({ activities, compact = false }: { activities: Activi
         <div className="flex gap-1.5">{freezeChips}</div>
       </div>
       <p className="mt-1 text-sm text-slate-400">
-        Weeks in a row with at least {MIN_RUNS_PER_WEEK} runs. This week: {s.thisWeekRuns} so far.
+        Weeks in a row with at least {MIN_RUNS_PER_WEEK} {runWord(MIN_RUNS_PER_WEEK)}. This week: {s.thisWeekRuns} so far.
       </p>
 
       <div className="mt-4 grid grid-cols-5 gap-2">

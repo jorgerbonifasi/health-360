@@ -47,7 +47,7 @@ export function distanceComparison(km: number): string | null {
 }
 
 // --- Streak with freezes -------------------------------------------------------------------
-export const MIN_RUNS_PER_WEEK = 2;
+export const MIN_RUNS_PER_WEEK = 1;
 export const FREEZE_EVERY = 4; // a freeze is earned every N qualifying weeks in a row
 export const MAX_FREEZES = 2;
 export const BADGES = [4, 12, 26, 52, 104];
