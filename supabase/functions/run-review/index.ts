@@ -104,6 +104,16 @@ Deno.serve(async (req) => {
     if (actError) throw new Error(actError.message);
 
     const activities = acts ?? [];
+
+    // Today isn't over, and a run takes a while to reach us from Strava. With nothing synced yet,
+    // grading it would record a false "skipped", so decline instead of writing a verdict.
+    if (plan.date === today && activities.length === 0) {
+      return json({
+        ok: false,
+        pending: true,
+        error: "No activity has synced for today yet. Strava can take up to an hour after you finish - try again shortly.",
+      }, 200);
+    }
     const runs = activities.filter((a) => (a.type_group ?? normalizeActivityType(a.type)) === "Run");
 
     const totalDistM = runs.reduce((s, a) => s + Number(a.distance_m ?? 0), 0);

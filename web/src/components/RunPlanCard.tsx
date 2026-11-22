@@ -60,6 +60,8 @@ export function RunPlanCard({
   // Oldest business first: the most recent plan still waiting on a verdict.
   const pending = plans.find((p) => !p.reviewed_at && p.date < today);
   const latestReview = plans.find((p) => p.reviewed_at && p.review_text);
+  // Today's plan can be graded as soon as the run has synced, not only the morning after.
+  const todayPending = todayPlan && !todayPlan.reviewed_at ? todayPlan : undefined;
 
   const plan = fresh ?? todayPlan?.plan_text ?? null;
 
@@ -81,11 +83,17 @@ export function RunPlanCard({
     }
   };
 
+  // Strava's webhook can lag a run by up to an hour, so for today's run pull the latest from
+  // Strava first rather than making the user press the dashboard's sync button and come back.
   const review = async (date: string) => {
     if (reviewing) return;
     setReviewing(true);
     setError(null);
     try {
+      if (date === today) {
+        const sync = await supabase.functions.invoke("reconcile", { body: { days: 2 } });
+        if (sync.error) throw new Error(await invokeError(sync.error as { message: string; context?: Response }));
+      }
       const res = await supabase.functions.invoke("run-review", { body: { date } });
       if (res.error) throw new Error(await invokeError(res.error as { message: string; context?: Response }));
       const data = res.data as { error?: string };
@@ -139,6 +147,23 @@ export function RunPlanCard({
               </>
             ) : (
               <>How did {dayLabel(pending.date)} go?</>
+            )}
+          </button>
+        )}
+
+        {todayPending && (
+          <button
+            type="button"
+            onClick={() => review(todayPending.date)}
+            disabled={reviewing}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-800 py-2 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition hover:text-white disabled:opacity-60"
+          >
+            {reviewing ? (
+              <>
+                <span className="inline-block animate-spin">⟳</span> Syncing &amp; reviewing…
+              </>
+            ) : (
+              <>How did today's run go?</>
             )}
           </button>
         )}
