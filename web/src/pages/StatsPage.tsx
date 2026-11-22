@@ -4,7 +4,6 @@ import { anchorDate, maxBack, periodLabel, type Period } from "../lib/metrics.ts
 import { PeriodToggle } from "../components/PeriodToggle.tsx";
 import { ScoreGauge } from "../components/ScoreGauge.tsx";
 import { SummaryHeader } from "../components/SummaryHeader.tsx";
-import { WeightChart } from "../components/WeightChart.tsx";
 import { StepsChart } from "../components/StepsChart.tsx";
 import { ActivityMixChart } from "../components/ActivityMixChart.tsx";
 import { RunningPanel } from "../components/RunningPanel.tsx";
@@ -100,10 +99,7 @@ export function StatsPage({ data }: { data: HealthData }) {
         </>
       )}
       {section === "body" && (
-        <>
-          <BodyWeightCard weights={data.weights} goals={data.goals} />
-          <WeightChart weights={data.weights} goals={data.goals} period={period} anchor={anchor} />
-        </>
+        <BodyWeightCard weights={data.weights} goals={data.goals} />
       )}
       {section === "health" && (
         <>

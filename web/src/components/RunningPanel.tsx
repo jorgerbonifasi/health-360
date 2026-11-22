@@ -9,7 +9,6 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Card } from "./Card.tsx";
 import type { Activity, Goal } from "../lib/types.ts";
 import {
   bucketCount,
@@ -17,6 +16,7 @@ import {
   formatPace,
   goalValue,
   periodAdjective,
+  periodNoun,
   recentBuckets,
   round1,
   type Period,
@@ -53,6 +53,7 @@ export function RunningPanel({
 }) {
   const data = buildRows(activities, period, anchor);
   const hasRuns = data.some((d) => d.km > 0);
+  const latest = data[data.length - 1];
   // Weekly goal scaled to the bucket (day = /7, month ≈ ×4.345 weeks).
   const weeklyGoal = goalValue(goals, "weekly_running_km_goal", NaN);
   const goal = Number.isNaN(weeklyGoal)
@@ -83,18 +84,33 @@ export function RunningPanel({
   })();
 
   return (
-    <Card title="Running" subtitle={`${periodAdjective(period)} km + avg pace · Run only`}>
+    <section className="rounded-2xl bg-surface p-4 ring-1 ring-white/5">
+      <h2 className="text-base font-semibold text-slate-100">Running</h2>
+      <p className="mt-0.5 text-xs text-slate-500">{periodAdjective(period)} km and average pace</p>
+      {hasRuns && (
+        <div className="mt-3 flex items-baseline gap-4">
+          <p className="text-4xl font-bold leading-none text-slate-100">
+            {round1(latest.km)}
+            <span className="ml-1 text-lg font-medium text-slate-400">km</span>
+          </p>
+          <p className="text-sm text-slate-400">
+            {periodNoun(period)} so far{latest.pace != null ? ` · ${formatPace(latest.pace)}` : ""}
+          </p>
+        </div>
+      )}
       {!hasRuns ? (
         <p className="py-8 text-center text-sm text-slate-500">No runs recorded yet.</p>
       ) : (
-        <div className="h-60">
+        <div className="mt-3 h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} minTickGap={10} />
+            <ComposedChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: -14 }}>
+              <CartesianGrid stroke="#ffffff" strokeOpacity={0.06} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} minTickGap={10} axisLine={false} tickLine={false} />
               <YAxis
                 yAxisId="km"
                 tick={{ fontSize: 11, fill: "#64748b" }}
+                axisLine={false}
+                tickLine={false}
                 width={34}
                 tickFormatter={(v) => String(Math.round(v))}
               />
@@ -106,28 +122,30 @@ export function RunningPanel({
                 ticks={paceTicks}
                 interval={0}
                 tick={{ fontSize: 11, fill: "#64748b" }}
+                axisLine={false}
+                tickLine={false}
                 width={40}
                 tickFormatter={(v) => formatPace(v).replace("/km", "")}
               />
               <Tooltip
-                cursor={{ fill: "#1e293b55" }}
-                contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8 }}
+                cursor={{ fill: "#ffffff0d" }}
+                contentStyle={{ background: "#2c2c2e", border: "none", borderRadius: 8, fontSize: 12 }}
                 labelStyle={{ color: "#e2e8f0" }}
                 formatter={(value: number, name: string) =>
                   name === "pace" ? [formatPace(value), "avg pace"] : [`${value} km`, "distance"]
                 }
               />
               {!Number.isNaN(goal) && (
-                <ReferenceLine yAxisId="km" y={goal} stroke="#f59e0b" strokeDasharray="4 4" />
+                <ReferenceLine yAxisId="km" y={goal} stroke="#fbbf24" strokeDasharray="5 4" />
               )}
-              <Bar yAxisId="km" dataKey="km" fill="#3b82f6" radius={[3, 3, 0, 0]} name="km" />
+              <Bar yAxisId="km" dataKey="km" fill="#a3e635" radius={[4, 4, 0, 0]} maxBarSize={28} name="km" />
               <Line
                 yAxisId="pace"
                 type="monotone"
                 dataKey="pace"
-                stroke="#f97316"
+                stroke="#e2e8f0"
                 strokeWidth={2}
-                dot={{ r: 2 }}
+                dot={{ r: 3, fill: "#e2e8f0", strokeWidth: 0 }}
                 connectNulls
                 name="pace"
                 isAnimationActive={false}
@@ -136,6 +154,6 @@ export function RunningPanel({
           </ResponsiveContainer>
         </div>
       )}
-    </Card>
+    </section>
   );
 }

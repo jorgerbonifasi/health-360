@@ -153,7 +153,7 @@ export function BodyWeightCard({
               formatter={(v: number) => [`${v} ${WEIGHT_UNIT}`, "Weight"]}
             />
             {goal != null && <ReferenceLine y={goal} stroke="#fbbf24" strokeDasharray="5 4" />}
-            <Area type="monotone" dataKey="v" stroke="#a3e635" strokeWidth={2} fill="url(#bw-fill)" dot={false} activeDot={{ r: 4 }} />
+            <Area type="monotone" dataKey="v" stroke="#a3e635" strokeWidth={2} fill="url(#bw-fill)" dot={{ r: 3, fill: "#a3e635", stroke: "#1c1c1e", strokeWidth: 1.5 }} activeDot={{ r: 5, fill: "#a3e635", stroke: "#1c1c1e", strokeWidth: 2 }} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
