@@ -14,7 +14,7 @@ import Anthropic from "npm:@anthropic-ai/sdk";
 import { getServiceClient } from "../_shared/supabase.ts";
 import { json, handlePreflight } from "../_shared/cors.ts";
 import { normalizeActivityType } from "../_shared/normalizeActivity.ts";
-import { dateKey, fmtDur, fmtPace, paceMinKm, renderPlanText, utcMidnight } from "../_shared/coach.ts";
+import { dateKey, fmtDur, fmtPace, fmtPaceRange, paceMinKm, renderPlanText, utcMidnight } from "../_shared/coach.ts";
 
 const MODEL = "claude-opus-4-8";
 
@@ -76,15 +76,26 @@ Deno.serve(async (req) => {
     const now = new Date();
     const since = new Date(now.getTime() - 14 * 86400000).toISOString();
 
-    const [actRes, goalsRes] = await Promise.all([
+    const todayKey = dateKey(utcMidnight(now));
+    const [actRes, goalsRes, histRes] = await Promise.all([
       client
         .from("activities")
         .select("type, type_group, name, started_at, distance_m, moving_time_s, avg_hr, max_hr")
         .gte("started_at", since)
         .order("started_at", { ascending: false }),
       client.from("goals").select("metric, target_value").eq("metric", "weekly_running_km_goal").maybeSingle(),
+      // Past prescriptions that have been graded, so the coach can see how its advice landed.
+      client
+        .from("run_plans")
+        .select("date, workout_type, target_distance_km, target_pace_min_km_low, target_pace_min_km_high, adherence, review_text, actual_distance_km, actual_pace_min_km, actual_avg_hr")
+        .lt("date", todayKey)
+        .not("reviewed_at", "is", null)
+        .order("date", { ascending: false })
+        .limit(5),
     ]);
     if (actRes.error) throw new Error(actRes.error.message);
+    // History is a nice-to-have: if it fails to load, still produce a plan.
+    const history = histRes.error ? [] : (histRes.data ?? []);
 
     const activities = actRes.data ?? [];
     const weeklyRunGoal = goalsRes.data ? Number(goalsRes.data.target_value) : null;
@@ -122,6 +133,17 @@ Deno.serve(async (req) => {
       lines.push("- " + parts.join(" · "));
     }
 
+    const historyLines = history.map((h) => {
+      const day = new Date(`${h.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      const asked = h.workout_type === "rest"
+        ? "rest"
+        : `${h.workout_type} ${h.target_distance_km ?? "?"}km @ ${fmtPaceRange(h.target_pace_min_km_low, h.target_pace_min_km_high)}`;
+      const did = h.actual_distance_km != null
+        ? `ran ${Number(h.actual_distance_km).toFixed(1)}km @ ${fmtPace(h.actual_pace_min_km)}${h.actual_avg_hr ? `, HR ${Math.round(h.actual_avg_hr)}` : ""}`
+        : "no run recorded";
+      return `- ${day}: asked ${asked}; ${did}; verdict: ${h.adherence}. ${h.review_text ?? ""}`.trim();
+    });
+
     const mean = (xs: number[]) => (xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : null);
     const avgRunHr = mean(runAvgHrs);
     const typicalMaxHr = mean(runMaxHrs);
@@ -140,6 +162,10 @@ Deno.serve(async (req) => {
       raceGoal ? `Race goal: ${raceGoal}.` : "No specific race goal — train for general fitness and the weekly km goal.",
       feel ? `Athlete note on how they feel today: "${feel}".` : "No note on how they feel today.",
       "",
+      historyLines.length
+        ? "How your recent prescriptions went (most recent first):\n" + historyLines.join("\n")
+        : "No graded history yet.",
+      "",
       "Activities in the last 14 days (most recent first):",
       lines.length ? lines.join("\n") : "(none)",
     ].filter((l) => l !== null).join("\n");
@@ -153,6 +179,9 @@ Deno.serve(async (req) => {
       "Set the target heart rate to match the workout intensity. If the athlete's max heart rate is " +
       "given, use standard zones (recovery/easy ~65–75%, tempo ~80–88%, intervals ~90–95% of max). If " +
       "it is unknown, estimate the range from their recent run heart rates.\n\n" +
+      "When graded history is given, learn from it: if the athlete keeps running easy days too hard " +
+      "or skipping a session type, set a firmer cap or a more achievable prescription and say so in " +
+      "'why'; if they follow the plan well, keep building. Do not repeat the history back at them.\n\n" +
       "For a rest day set workout_type to 'rest' and leave distance_km, both pace fields and both HR " +
       "fields null. Pace is decimal minutes per kilometre: 5.5 means 5:30/km.";
 
