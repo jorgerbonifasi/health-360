@@ -38,7 +38,7 @@ function PillarBar({ label, value, color }: { label: string; value: number | nul
           {value == null ? "no data" : Math.round(value)}
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-700">
+      <div className="h-2 overflow-hidden rounded-full bg-raised">
         <div
           className="h-full rounded-full"
           style={{ width: `${pct}%`, backgroundColor: value == null ? "#475569" : color }}
@@ -168,11 +168,11 @@ export function ScoreGauge({
   const color = scoreColor(value);
 
   return (
-    <div className="rounded-2xl bg-slate-800/60 p-5 shadow-lg ring-1 ring-white/5">
+    <div className="rounded-2xl bg-surface p-5 ring-1 ring-white/5">
       <div className="flex items-center gap-5">
         <div className="relative shrink-0" style={{ width: size, height: size }}>
           <svg width={size} height={size} className="-rotate-90">
-            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#334155" strokeWidth={stroke} />
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#2c2c2e" strokeWidth={stroke} />
             <circle
               cx={size / 2}
               cy={size / 2}

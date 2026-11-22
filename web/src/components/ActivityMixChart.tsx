@@ -50,22 +50,23 @@ export function ActivityMixChart({
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
-              <CartesianGrid stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} minTickGap={10} />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} width={36} unit="h" />
+              <CartesianGrid stroke="#ffffff" strokeOpacity={0.06} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} minTickGap={10} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} width={36} unit="h" axisLine={false} tickLine={false} />
               <Tooltip
-                cursor={{ fill: "#1e293b55" }}
-                contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8 }}
+                cursor={{ fill: "#ffffff0d" }}
+                contentStyle={{ background: "#2c2c2e", border: "none", borderRadius: 8, fontSize: 12 }}
                 labelStyle={{ color: "#e2e8f0" }}
               />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "#94a3b8" }} iconType="circle" iconSize={8} />
               {ACTIVITY_GROUPS.map((group) => (
                 <Bar
                   key={group}
                   dataKey={group}
                   stackId="hours"
                   fill={GROUP_COLORS[group]}
-                  radius={group === "Other" ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                  radius={group === "Other" ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                  maxBarSize={28}
                 />
               ))}
             </BarChart>

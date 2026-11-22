@@ -51,10 +51,10 @@ export const ACTIVITY_GROUPS: ActivityGroup[] = [
 
 // Consistent color per activity group across the dashboard.
 export const GROUP_COLORS: Record<ActivityGroup, string> = {
-  Run: "#3b82f6",
-  Ride: "#f97316",
-  "Hike/Walk": "#10b981",
-  "Racket sports": "#a855f7",
+  Run: "#a3e635",
+  Ride: "#fb923c",
+  "Hike/Walk": "#34d399",
+  "Racket sports": "#a78bfa",
   Other: "#64748b",
 };
 

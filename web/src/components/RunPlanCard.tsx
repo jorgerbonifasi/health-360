@@ -110,7 +110,7 @@ export function RunPlanCard({
     <Card title="Coach" subtitle="Today's run, from your last 2 weeks of training">
       <div className="space-y-3">
         {latestReview && (
-          <div className="rounded-xl bg-slate-900/60 p-3 ring-1 ring-white/5">
+          <div className="rounded-xl bg-raised/60 p-3 ring-1 ring-white/5">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-slate-300">
                 How {dayLabel(latestReview.date)} went
@@ -173,7 +173,7 @@ export function RunPlanCard({
           value={feel}
           onChange={(e) => setFeel(e.target.value)}
           placeholder="How do you feel today? (optional — e.g. legs sore, slept badly)"
-          className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500 focus:outline-none focus:ring-accent"
+          className="w-full rounded-lg bg-canvas px-3 py-2 text-sm text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500 focus:outline-none focus:ring-accent"
           onKeyDown={(e) => e.key === "Enter" && getPlan()}
         />
 
@@ -195,7 +195,7 @@ export function RunPlanCard({
         {error && <p className="text-xs text-rose-400">{error}</p>}
 
         {plan && !loading && (
-          <div className="whitespace-pre-line rounded-xl bg-slate-900/60 p-3 text-sm leading-relaxed text-slate-200 ring-1 ring-white/5">
+          <div className="whitespace-pre-line rounded-xl bg-raised/60 p-3 text-sm leading-relaxed text-slate-200 ring-1 ring-white/5">
             {plan}
           </div>
         )}

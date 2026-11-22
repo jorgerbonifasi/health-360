@@ -28,7 +28,7 @@ function Field({
           step={step}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-24 rounded-lg bg-slate-900 px-2 py-1 text-right text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-blue-500"
+          className="w-24 rounded-lg bg-canvas px-2 py-1 text-right text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-accent"
         />
         {suffix && <span className="w-8 text-xs text-slate-500">{suffix}</span>}
       </span>
@@ -96,7 +96,7 @@ export function SettingsPanel({
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-slate-800 p-5 ring-1 ring-white/10"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 ring-1 ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-3 text-base font-semibold text-slate-100">Goals & scoring</h2>
@@ -114,7 +114,7 @@ export function SettingsPanel({
                 inputMode="decimal"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                className="w-24 rounded-lg bg-slate-900 px-2 py-1 text-right text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-blue-500"
+                className="w-24 rounded-lg bg-canvas px-2 py-1 text-right text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-accent"
               />
               <span className="w-8 text-xs text-slate-500">{WEIGHT_UNIT}</span>
             </span>
@@ -124,7 +124,7 @@ export function SettingsPanel({
             <select
               value={dir}
               onChange={(e) => setDir(e.target.value as "down" | "up")}
-              className="rounded-lg bg-slate-900 px-2 py-1 text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-blue-500"
+              className="rounded-lg bg-canvas px-2 py-1 text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-accent"
             >
               <option value="down">trending down</option>
               <option value="up">trending up</option>
@@ -152,7 +152,7 @@ export function SettingsPanel({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg bg-slate-700 py-2 text-sm text-slate-200 hover:bg-slate-600"
+            className="flex-1 rounded-lg bg-raised py-2.5 text-sm text-slate-200 hover:brightness-110"
           >
             Cancel
           </button>
@@ -160,7 +160,7 @@ export function SettingsPanel({
             type="button"
             onClick={save}
             disabled={saving}
-            className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-60"
+            className="flex-1 rounded-lg bg-accent py-2.5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save"}
           </button>

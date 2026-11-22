@@ -15,7 +15,7 @@ import { Delta } from "./Delta.tsx";
 
 function Stat({ label, value, delta }: { label: string; value: string; delta?: ReactNode }) {
   return (
-    <div className="rounded-xl bg-slate-800/60 p-3 ring-1 ring-white/5">
+    <div className="rounded-xl bg-surface p-3 ring-1 ring-white/5">
       <div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div>
       <div className="mt-0.5 text-lg font-semibold tabular-nums text-slate-100">{value}</div>
       {delta && <div className="mt-0.5">{delta}</div>}
