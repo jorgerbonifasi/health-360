@@ -1,6 +1,6 @@
 # Health 360 — Session Handover
 
-Last updated: 2026-11-22
+Last updated: 2026-11-22 (phase 3: weekly plan)
 
 Personal single-user health dashboard: aggregates Withings (weight), Strava (exercise), and
 Apple Health (steps) into Supabase, computes a daily 0–100 Health 360 score, serves a React
@@ -38,6 +38,8 @@ nightly pg_cron ─▶ reconcile ───────────────�
 nightly pg_cron ─▶ compute-scores ──────────────────────────┘
 dashboard button ─▶ run-plan ──▶ Claude API (AI coach) ──▶ run_plans
 dashboard button ─▶ run-review ─▶ Claude API (grades a plan vs. what you ran) ──▶ run_plans
+Plan tab button ───▶ plan-week ──▶ Claude API (the week's plan) ──▶ run_plans
+nightly pg_cron ─▶ run-review (04:00) · check-sources (04:10) ──▶ ntfy push to your phone
 dashboard ⚙️ ─────▶ update-goals
 ```
 
@@ -52,7 +54,7 @@ auto-injected service role. The Anthropic API key lives only in function secrets
 
 ---
 
-## Database (9 Edge Functions, 7 tables)
+## Database (11 Edge Functions, 7 tables)
 
 Tables: `weight_logs`, `daily_steps`, `activities`, `goals`, `daily_scores`, `oauth_tokens`,
 `run_plans`.
@@ -71,9 +73,12 @@ All ingestion is idempotent via unique constraints:
 | `update-goals` | Settings panel writes (allow-listed metrics) | anon JWT |
 | `run-plan` | AI running coach → Claude; stores the plan in `run_plans` | anon JWT |
 | `run-review` | Grades a stored plan against that day's activities | anon JWT |
+| `plan-week` | Lays out the days ahead toward the weekly km goal → `run_plans` (one row/day) | anon JWT |
+| `check-sources` | Nightly watchdog: ntfy push when a source goes stale / Strava app rejected | anon JWT |
 
-**Cron:** `health360-reconcile` (03:10 UTC) + `health360-compute-scores` (03:20 UTC), via
-pg_cron + pg_net, posting with the anon key as bearer.
+**Cron** (pg_cron + pg_net, anon-key bearer): `health360-reconcile` 03:10 UTC, `health360-compute-scores` 03:20,
+`health360-run-review` 04:00 (grades the latest unreviewed past plan), `health360-check-sources` 04:10
+(migrations 0002, 0004). `plan-week` is button-driven, not scheduled.
 
 ### The Health 360 score
 Three pillars: **Movement 40%** (steps ÷ daily goal), **Exercise 40%** (rolling 7-day active
@@ -105,13 +110,26 @@ source priority **Apple Watch > Connect/Garmin > iPhone** with interval-level ga
 
 ---
 
-## Dashboard features
+## Dashboard (React/Vite/Tailwind, mobile-first, dark + lime)
 
-Day / Week / Month toggle · **‹ › time-machine navigation** (view any past period; anchor date
-threaded through every panel) · score gauge with pillar bars, sparkline and WoW/MoM delta ·
-expandable "How this score works" · summary stats with deltas · weight (in **lb**) · steps ·
-training load by sport · running (km + pace) · this-week activity log · per-source "last synced"
-footer · ↻ manual sync button · ⚙️ goals/scoring settings · 🏃 **AI coach**.
+The UX is borrowed from openGym (layout and patterns only, no code or assets copied; its repo is
+AGPL-style, so don't lift code). Four tabs in a bottom bar; the tab lives in the URL hash (`#/plan`).
+
+| Tab | Contents |
+|---|---|
+| **Home** | Mo-Su week strip (km toward goal), Today card, Body weight card, streak card, compact Health 360 tile, last-synced footer |
+| **Plan** | Weekly plan (7 day-cards, week pager, "Plan my week") + plan history with adherence chips |
+| **Coach** | Daily plan + "How did yesterday / today's run go?" review (`RunPlanCard`) |
+| **Stats** | Overview (Runs / This month / Weight 30d strip, run total, week streak + freezes + badges, 12-month heatmap, recent runs), Runs, Body (weight 1M/3M/1Y/All), Health (score gauge, steps, sport mix) |
+
+Code map: `web/src/pages/*` (one per tab), `components/` (WeekStrip, TodayCard, WeekPlan, StreakCard,
+ActivityHeatmap, BodyWeightCard, StatsStrip, RunTotalCard, RecentRuns, ScoreTile, TabBar, StaleBanner),
+`lib/stats.ts` (all derived running stats: streak, heatmap, weight trend), `lib/metrics.ts` (older
+period/bucket helpers). Theme tokens (`canvas`, `surface`, `raised`, `accent`) are in `tailwind.config.js`.
+
+**Streak rule:** a week (Mon-Sun, local) counts with `MIN_RUNS_PER_WEEK` = 1+ run; a freeze is earned every 4
+qualifying weeks (max 2) and spent automatically on a missed week. Constants at the top of `lib/stats.ts`.
+Computed in the browser from `activities`; data window is ~13 months, so totals mean "since data starts".
 
 **Conventions worth knowing:**
 - Weight is stored canonically in **kg**; `WEIGHT_UNIT` in `web/src/lib/metrics.ts` converts to
@@ -146,6 +164,45 @@ Regenerating a day's plan clears its review. **Not yet exercised live:** the rev
   (build vs. taper). Not set yet.
 - `MAX_HR` — known max heart rate → switches Target HR from *inferred* to proper zone-based
   (easy 65–75%, tempo 80–88%, intervals 90–95%). Not set yet.
+
+---
+
+## Weekly plan (`plan-week`, phase 3)
+
+**What it does.** The Plan tab's "Plan my week" calls `plan-week`, which asks Claude (Opus 4.8, adaptive
+thinking, structured JSON via `output_config.format`) for one entry per date and upserts one `run_plans`
+row per day. A day's plan, its review and the week view are therefore the same row as the daily coach.
+
+**Window rules.** Plans today onward; from *tomorrow* if you've already run today (so it never rewrites a day
+you've done); and through *next* Sunday when under two days of this week remain. The UI jumps to next week
+when the response says `window: "next_week"`. Days already **reviewed are never overwritten**; today's `feel`
+note is preserved.
+
+**Prompt design decisions (don't undo without reason).**
+- The weekly km goal (`weekly_running_km_goal`, 40) is a **target, not an obligation**: the coach ramps from the
+  recent 3-week average (~11 km on 22 Nov) and is capped at ~15% above it. Real output: 13 km for next week.
+- It's told which week it is planning and how many km were already run *inside that window*, because the first
+  version counted this week's 10 km toward next week and quoted a total that disagreed with the plan.
+- The summary is forbidden from quoting km totals; the UI computes Planned / Done / Goal itself.
+- Racket sports count as load; at most one hard session; graded history (last 5 reviews) feeds the prompt.
+- Rest days are forced to null distance/pace/HR in code, not trusted to the model.
+- `RACE_GOAL` / `MAX_HR` are read if set but **deliberately unset** (no race; no max HR) - the user chose this.
+
+**UI.** `components/WeekPlan.tsx`: ‹ › week pager (-8..+1), Planned / Done / Goal + progress bar, day-cards with
+type chip, km, pace, HR, status (Ran X km / Rest / Planned / No run); tap a day for "why", cue and review.
+Past days with no plan and no run collapse to a slim line. The model's `summary` is shown only for the session
+it was generated in (not persisted - a known gap).
+
+**Known limits / next steps.**
+- **Slow:** ~60 s per call (Opus + thinking). Sonnet 5.5 at low effort would likely be a few seconds; the
+  daily review already runs on Sonnet. Not yet tried.
+- Summary not stored; there's no per-day "move this run" editing; no insight cards or monthly challenges yet.
+- Plan dates are UTC; run dots use the local date. Fine in the UK except for a run after ~midnight BST.
+- Regenerating *today's* plan after you've run it produces a misleading "rest" row (it sees the run) and
+  clears that day's review. This bit us on 22 Nov (an accidental `run-plan` call); the row was restored by hand.
+  A guard (skip or label plans generated after that day's activity) is not built.
+- **Testing the coach functions writes real rows** and spends money; there is no dry-run flag on `run-plan`
+  or `plan-week`. Use `check-sources?dry=1` only for the watchdog.
 
 ---
 
@@ -193,6 +250,13 @@ harmless). Run DDL in the dashboard SQL editor, or via the Management API with a
 ---
 
 ## Open items / next steps
+
+**Next candidates (not started):** speed up `plan-week` (Sonnet / lower effort); insight cards ("no easy run in 9
+days", "easy-run HR drifting") and monthly challenges on Home; persist the weekly summary; guard against
+regenerating a plan after the run; watchdog gaps (weight silent past its thresholds, no alert if
+`compute-scores` fails); lock down access (the dashboard + anon key are public and the two coach functions
+spend money on anonymous calls); weight has had no weigh-in since 27 Aug (cause unchecked - Withings or just
+no weigh-ins).
 
 **Housekeeping:** the setup tokens are still active by choice (so work can continue) — a GitHub
 classic PAT + 2 fine-grained PATs, and a Supabase PAT. Revoke at github.com/settings/tokens and
