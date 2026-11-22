@@ -70,10 +70,33 @@ Deno.serve(async (req) => {
 
   try {
     const client = getServiceClient();
+
+    // A day's step count can only go up, so never let a later push lower it. A push that lands
+    // just after midnight carries only a few minutes of data (we stored 8 and 44 steps that
+    // way) and a blind upsert would let that partial overwrite — and stick — over the real total.
+    const { data: existing, error: readError } = await client
+      .from("daily_steps")
+      .select("date, steps, raw")
+      .eq("source", "apple_health")
+      .in("date", rows.map((r) => r.date));
+    if (readError) throw new Error(readError.message);
+
+    const stored = new Map((existing ?? []).map((r: any) => [r.date, r]));
+    let kept = 0;
+    for (const row of rows) {
+      const prev = stored.get(row.date);
+      if (prev && Number(prev.steps) > row.steps) {
+        row.steps = Number(prev.steps);
+        row.raw = prev.raw; // keep the entries that produced the higher total
+        kept++;
+      }
+    }
+
     const { error } = await client
       .from("daily_steps")
       .upsert(rows, { onConflict: "source,date" });
     if (error) throw new Error(error.message);
+    if (kept > 0) console.log(`apple-health: kept higher stored total for ${kept} day(s)`);
   } catch (e) {
     console.error("apple-health upsert error", e);
     return json({ error: "failed to store steps", detail: e instanceof Error ? e.message : String(e) }, 500);

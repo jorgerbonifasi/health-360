@@ -13,6 +13,7 @@ import { RunningPanel } from "./components/RunningPanel.tsx";
 import { RunPlanCard } from "./components/RunPlanCard.tsx";
 import { ActivityLog } from "./components/ActivityLog.tsx";
 import { LastSynced } from "./components/LastSynced.tsx";
+import { StaleBanner } from "./components/StaleBanner.tsx";
 
 export default function App() {
   const { data, loading, error, refetch } = useHealthData();
@@ -97,6 +98,7 @@ export default function App() {
 
       {data && (
         <div className="space-y-4">
+          <StaleBanner steps={data.steps} weights={data.weights} />
           <ScoreGauge scores={data.scores} goals={data.goals} period={period} anchor={anchor} />
           <SummaryHeader
             weights={data.weights}
