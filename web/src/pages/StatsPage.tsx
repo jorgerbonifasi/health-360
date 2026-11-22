@@ -9,13 +9,19 @@ import { StepsChart } from "../components/StepsChart.tsx";
 import { ActivityMixChart } from "../components/ActivityMixChart.tsx";
 import { RunningPanel } from "../components/RunningPanel.tsx";
 import { ActivityLog } from "../components/ActivityLog.tsx";
+import { BodyWeightCard } from "../components/BodyWeightCard.tsx";
+import { StatsStrip } from "../components/StatsStrip.tsx";
+import { RunTotalCard } from "../components/RunTotalCard.tsx";
+import { StreakCard } from "../components/StreakCard.tsx";
+import { ActivityHeatmap } from "../components/ActivityHeatmap.tsx";
+import { RecentRuns } from "../components/RecentRuns.tsx";
 
-type Section = "overview" | "runs" | "body" | "load";
+type Section = "overview" | "runs" | "body" | "health";
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "runs", label: "Runs" },
   { id: "body", label: "Body" },
-  { id: "load", label: "Load" },
+  { id: "health", label: "Health" },
 ];
 
 // Segmented sections like openGym's Stats. The existing charts are re-homed, not rebuilt; the
@@ -45,6 +51,7 @@ export function StatsPage({ data }: { data: HealthData }) {
         ))}
       </div>
 
+      {(section === "runs" || section === "health") && (
       <div className="flex flex-wrap items-center gap-3">
         <PeriodToggle
           period={period}
@@ -75,8 +82,30 @@ export function StatsPage({ data }: { data: HealthData }) {
           </button>
         </nav>
       </div>
+      )}
 
       {section === "overview" && (
+        <>
+          <StatsStrip activities={data.activities} weights={data.weights} goals={data.goals} />
+          <RunTotalCard activities={data.activities} />
+          <StreakCard activities={data.activities} />
+          <ActivityHeatmap activities={data.activities} />
+          <RecentRuns activities={data.activities} />
+        </>
+      )}
+      {section === "runs" && (
+        <>
+          <RunningPanel activities={data.activities} goals={data.goals} period={period} anchor={anchor} />
+          <ActivityLog activities={data.activities} />
+        </>
+      )}
+      {section === "body" && (
+        <>
+          <BodyWeightCard weights={data.weights} goals={data.goals} />
+          <WeightChart weights={data.weights} goals={data.goals} period={period} anchor={anchor} />
+        </>
+      )}
+      {section === "health" && (
         <>
           <ScoreGauge scores={data.scores} goals={data.goals} period={period} anchor={anchor} />
           <SummaryHeader
@@ -87,19 +116,6 @@ export function StatsPage({ data }: { data: HealthData }) {
             period={period}
             anchor={anchor}
           />
-        </>
-      )}
-      {section === "runs" && (
-        <>
-          <RunningPanel activities={data.activities} goals={data.goals} period={period} anchor={anchor} />
-          <ActivityLog activities={data.activities} />
-        </>
-      )}
-      {section === "body" && (
-        <WeightChart weights={data.weights} goals={data.goals} period={period} anchor={anchor} />
-      )}
-      {section === "load" && (
-        <>
           <StepsChart steps={data.steps} goals={data.goals} period={period} anchor={anchor} />
           <ActivityMixChart activities={data.activities} period={period} anchor={anchor} />
         </>
