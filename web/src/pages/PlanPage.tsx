@@ -1,5 +1,6 @@
 import type { HealthData } from "../hooks/useHealthData.ts";
 import { Card } from "../components/Card.tsx";
+import { WeekPlan } from "../components/WeekPlan.tsx";
 import { ADHERENCE_LABELS } from "../lib/types.ts";
 
 function fmtDate(iso: string): string {
@@ -12,17 +13,21 @@ function fmtDate(iso: string): string {
 
 // For now this is the coach's history: each day's prescription and how it went. The weekly plan
 // (the coming seven days toward your km goal) replaces the top of this page in the next phase.
-export function PlanPage({ data }: { data: HealthData }) {
-  const plans = data.runPlans;
-  if (plans.length === 0) {
-    return (
-      <Card title="Plan" subtitle="Your coach's plans will appear here">
-        <p className="text-sm text-slate-400">Ask the coach for today's run to start your history.</p>
-      </Card>
-    );
-  }
+export function PlanPage({ data, onChanged }: { data: HealthData; onChanged: () => void | Promise<void> }) {
+  const goal = data.goals.find((g) => g.metric === "weekly_running_km_goal");
+  const today = new Date().toISOString().slice(0, 10);
+  // History = plans for days that are over; the week view above covers today and what's ahead.
+  const plans = data.runPlans.filter((p) => p.date < today);
 
   return (
+    <div className="space-y-4">
+      <WeekPlan
+        plans={data.runPlans}
+        activities={data.activities}
+        weeklyKmGoal={goal ? Number(goal.target_value) : null}
+        onChanged={onChanged}
+      />
+      {plans.length > 0 && (
     <Card title="Plan history" subtitle="What the coach asked for, and how it went">
       <ul className="divide-y divide-white/5">
         {plans.map((p) => {
@@ -58,5 +63,7 @@ export function PlanPage({ data }: { data: HealthData }) {
         })}
       </ul>
     </Card>
+      )}
+    </div>
   );
 }

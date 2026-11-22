@@ -87,7 +87,7 @@ export default function App() {
       {data && (
         <>
           {tab === "home" && <HomePage data={data} go={go} />}
-          {tab === "plan" && <PlanPage data={data} />}
+          {tab === "plan" && <PlanPage data={data} onChanged={refetch} />}
           {tab === "coach" && <CoachPage data={data} onChanged={refetch} />}
           {tab === "stats" && <StatsPage data={data} />}
         </>

@@ -71,10 +71,10 @@ async function fetchAll(): Promise<HealthData> {
     supabase
       .from("run_plans")
       .select(
-        "date, plan_text, workout_type, target_distance_km, target_pace_min_km_low, target_pace_min_km_high, target_hr_low, target_hr_high, feel, generated_at, reviewed_at, review_text, adherence, actual_distance_km, actual_pace_min_km, actual_avg_hr",
+        "date, plan_text, workout_type, target_distance_km, target_pace_min_km_low, target_pace_min_km_high, target_hr_low, target_hr_high, why, reminder, feel, generated_at, reviewed_at, review_text, adherence, actual_distance_km, actual_pace_min_km, actual_avg_hr",
       )
       .order("date", { ascending: false })
-      .limit(30),
+      .limit(60),
   ]);
 
   const firstError =

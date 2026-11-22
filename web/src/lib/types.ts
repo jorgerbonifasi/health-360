@@ -78,6 +78,8 @@ export interface RunPlan {
   target_pace_min_km_high: number | null;
   target_hr_low: number | null;
   target_hr_high: number | null;
+  why: string | null;
+  reminder: string | null;
   feel: string | null;
   generated_at: string; // ISO
   reviewed_at: string | null; // ISO — null means not reviewed yet
