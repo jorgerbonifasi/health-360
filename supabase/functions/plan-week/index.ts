@@ -110,6 +110,11 @@ Deno.serve(async (req) => {
       `- ${o === 0 ? "This week so far" : `${-o} week${o === -1 ? "" : "s"} ago`}: ${weekKm(o).toFixed(1)} km`
     );
     const recentAvg = [-3, -2, -1].map(weekKm).reduce((s, x) => s + x, 0) / 3;
+    // Anchor on what the athlete has actually shown, not a 3-week average that low weeks drag down.
+    const bestRecentWeek = Math.max(...[-4, -3, -2, -1].map(weekKm));
+    const runKms = activities.filter(isRun).map((a) => (a.distance_m ?? 0) / 1000).filter((k) => k > 0).sort((a, b) => a - b);
+    const longestRun = runKms.length ? runKms[runKms.length - 1] : 0;
+    const typicalRun = runKms.length ? runKms[Math.floor(runKms.length / 2)] : 0;
 
     // Km already run on days inside the planned window (before today). When the window is next week
     // that is zero, so this week's km must not be counted toward it.
@@ -154,7 +159,8 @@ Deno.serve(async (req) => {
       ...dates.map((d) => `- ${d} (${WEEKDAYS[dow(new Date(`${d}T00:00:00Z`))]})`),
       "",
       goalKm ? `Weekly running goal: ${goalKm} km.` : "No weekly km goal set.",
-      `Recent weekly average (last 3 full weeks): ${recentAvg.toFixed(1)} km.`,
+      `Recent weekly average (last 3 full weeks): ${recentAvg.toFixed(1)} km. Best of the last 4 full weeks: ${bestRecentWeek.toFixed(1)} km.`,
+      `Longest single run in the last 5 weeks: ${longestRun.toFixed(1)} km. Typical run: ${typicalRun.toFixed(1)} km.`,
       "Run km per week:",
       ...weeklyLines,
       maxHr ? `Known max heart rate: ${maxHr} bpm.` : "Max heart rate unknown - infer HR ranges from recent run HR.",
@@ -170,14 +176,19 @@ Deno.serve(async (req) => {
     const system =
       "You are an experienced, pragmatic running coach planning the rest of an athlete's training week. " +
       "Return exactly one entry for each listed date and nothing else.\n\n" +
-      "The weekly km goal is a TARGET, not an obligation. Ramp from what the athlete has actually been " +
-      "running: do not plan a week more than about 15% above their recent weekly average, even if the " +
-      "goal is higher, and say in the summary how far the plan gets toward the goal. Count km already run " +
-      "this week. Use full rest days freely. Plan at most one hard session (tempo or intervals) in the " +
-      "week and follow it with a rest or easy day. Treat racket sports and other activity as real load - " +
-      "do not put a hard run the day after a long or intense non-running session. Put the longest run on " +
-      "a weekend day if one is listed. When graded history is given, learn from it: if easy days keep " +
-      "coming in too hard, set a firmer HR cap; if the plan is being followed well, keep building. Never " +
+      "The weekly km goal is a TARGET, not an obligation. Build from the athlete's BEST recent week, not " +
+      "their average: plan a total roughly 5-15% above the best of the last four full weeks, and never " +
+      "below it unless the history shows they are run down. Say in the summary how far the plan gets " +
+      "toward the goal. Count km already run this week. Use rest days freely, but do not under-plan: aim " +
+      "for three or four runs a week when recent weeks allow it. Run lengths must reflect what they have " +
+      "already shown they can do: include one longer run of roughly 70-100% of their longest recent run " +
+      "(put it on a weekend day if one is listed), and make the other runs about their typical run " +
+      "length, not a fraction of it. Do not schedule a week of runs far shorter than their recent single " +
+      "runs. Plan at most one hard session (tempo or intervals) in the week and follow it with a rest or " +
+      "easy day. Treat racket sports and other activity as real load - do not put a hard run the day " +
+      "after a long or intense non-running session. When graded history is given, learn from it: if easy " +
+      "days keep coming in too hard, set a firmer HR cap rather than shrinking the distance; if the plan " +
+      "is being followed well, keep building. Never " +
       "invent activities that aren't listed.\n\n" +
       "Set target heart rate to match intensity: with a known max HR use standard zones (easy ~65-75%, " +
       "tempo ~80-88%, intervals ~90-95%); otherwise infer from recent run heart rates. For a rest day set " +
